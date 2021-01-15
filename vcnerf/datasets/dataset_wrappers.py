@@ -54,7 +54,7 @@ class RepeatDataset(object):
     def __init__(self, dataset, times):
         self.dataset = dataset
         self.times = times
-        self.CLASSES = dataset.CLASSES
+        # self.CLASSES = dataset.CLASSES
 
         self._ori_len = len(self.dataset)
 

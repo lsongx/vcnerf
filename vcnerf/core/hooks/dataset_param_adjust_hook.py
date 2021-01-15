@@ -14,7 +14,7 @@ class DatasetParamAdjustHook(Hook):
     def after_train_iter(self, runner):
         for name, adjust_iter, value in self.param_name_adjust_iter_value:
             if (runner.iter + 1) == adjust_iter:
-                for loader in runner.dataloader:
+                for loader in runner.data_loaders:
                     old_value = getattr(loader.dataset, name, 'Undefined')
                     setattr(loader.dataset, name, value)
                     if self.logger:

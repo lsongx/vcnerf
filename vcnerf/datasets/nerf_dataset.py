@@ -13,6 +13,7 @@ class NeRFDataset(Dataset):
         super().__init__()
         assert split in ('train', 'val', 'test'), split
         self.loader = build_from_cfg(loader, LOADERS)
+        self.w, self.h = self.loader.w, self.loader.h
         self.split = split
         self.holdout = holdout
 

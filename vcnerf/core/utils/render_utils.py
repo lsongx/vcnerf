@@ -6,7 +6,7 @@ im2mse = lambda x, y : torch.mean((x - y) ** 2)
 mse2psnr = lambda x : -10 * torch.log(x) / torch.log(torch.as_tensor([10], dtype=torch.float32, device=x.device))
 
 
-def raw2outputs(alphas, colors, z_vals, rays_dir, alpha_noise_std, white_bG):
+def raw2outputs(alphas, colors, z_vals, rays_dir, alpha_noise_std, white_bkgd):
     def process_alphas(alphas, dists, act_fn=torch.nn.functional.relu): 
         return 1 - torch.exp(-act_fn(alphas) * dists)
 
@@ -62,7 +62,7 @@ def raw2outputs(alphas, colors, z_vals, rays_dir, alpha_noise_std, white_bG):
     acc_map = torch.sum(weights, dim=-1)
 
     # To composite onto a white backGround, use the accumulated alpha map
-    if white_bG:
+    if white_bkgd:
         color_map = color_map + (1 - acc_map[..., None]) 
 
     outputs = {

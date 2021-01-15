@@ -4,10 +4,10 @@ import random
 import json
 import numpy as np
 import imageio
+import cv2
 import torch
 
 from vcnerf.utils import get_root_logger
-from ..utils import collect_rays, center_poses
 from .builder import DATASETS
 
 
@@ -69,13 +69,14 @@ class SyntheticDataset(object):
                  batch_size,
                  white_bkgd=True,
                  precrop_frac=0.5,
-                 testskip=8):
+                 testskip=8,):
         super().__init__()
         self.logger = get_root_logger()
         self.base_dir = os.path.expanduser(base_dir)
         self.split = split
         self.half_res = half_res
         self.batch_size = batch_size
+        self.white_bkgd = white_bkgd
         self.precrop_frac = precrop_frac
         self.testskip = testskip
 
@@ -118,9 +119,9 @@ class SyntheticDataset(object):
             self.w = self.w//2
             self.focal = self.focal/2.
 
-            imgs_half_res = np.zeros((self.imgs.shape[0], H, W, 4))
+            imgs_half_res = np.zeros((self.imgs.shape[0], self.h, self.w, 4))
             for i, img in enumerate(self.imgs):
-                imgs_half_res[i] = cv2.resize(img, (W, H), interpolation=cv2.INTER_AREA)
+                imgs_half_res[i] = cv2.resize(img, (self.w, self.h), interpolation=cv2.INTER_AREA)
             self.imgs = imgs_half_res
 
         if self.white_bkgd:
@@ -131,13 +132,18 @@ class SyntheticDataset(object):
         self.imgs = torch.tensor(self.imgs)
         self.poses = torch.tensor(self.poses)
 
+    def __len__(self):
+        return len(self.imgs)
+
     def __getitem__(self, idx):
         target = self.imgs[idx]
         pose = self.poses[idx, :3,:4]
         rays_ori, rays_dir = get_rays(self.h, self.w, self.focal, pose)
 
         if self.batch_size == -1:
-            return {'rays_ori': rays_ori, 'rays_dir': rays_dir, 
+            rays_color = target.view([-1,3])  # (N, 3)
+            return {'rays_ori': rays_ori.view([-1,3]), 
+                    'rays_dir': rays_dir.view([-1,3]), 
                     'rays_color': rays_color, 'ndc_rays_ori': 0, 
                     'ndc_rays_dir': 0, 'near': self.near, 'far': self.far}
 

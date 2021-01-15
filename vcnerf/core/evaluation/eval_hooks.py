@@ -27,7 +27,7 @@ class EvalHook(Hook):
         self.logger = logger
         self.best_psnr = 0
         self.im_shape = (
-            dataloader.dataset.loader.h, dataloader.dataset.loader.w, 3)
+            dataloader.dataset.h, dataloader.dataset.w, 3)
 
     def after_train_iter(self, runner):
         if not self.every_n_iters(runner, self.interval):
@@ -65,13 +65,13 @@ class EvalHook(Hook):
             im = 255 * im.detach().cpu().numpy()
             # TODO: convert to video
             cv2.imwrite(osp.join(
-                self.out_dir, '{}-{}-coarse.PNG'.format(runner.iter, i)), im[:,:,::-1])
+                self.out_dir, f'iter{runner.iter}-id{i}-coarse.png'), im[:,:,::-1])
             if outputs['fine'] is not None:
                 im = outputs['fine']['color_map'].reshape(self.im_shape)
                 im = 255 * im.detach().cpu().numpy()
                 # TODO: convert to video
                 cv2.imwrite(osp.join(
-                    self.out_dir, '{}-{}-fine.PNG'.format(runner.iter, i)), im[:,:,::-1])
+                    self.out_dir, f'iter{runner.iter}-id{i}-fine.png'), im[:,:,::-1])
 
             loss += outputs['log_vars']['loss']
             psnr += outputs['log_vars']['psnr']
@@ -100,10 +100,7 @@ class DistEvalHook(Hook):
         self.logger = logger
         self.best_psnr = 0
         self.im_shape = (
-            int(dataloader.dataset.loader.H), 
-            int(dataloader.dataset.loader.W),
-            3
-        )
+            int(dataloader.dataset.h), int(dataloader.dataset.w), 3)
 
     def after_train_iter(self, runner):
         if not self.every_n_iters(runner, self.interval):
@@ -144,14 +141,14 @@ class DistEvalHook(Hook):
             # TODO: convert to video
             cv2.imwrite(osp.join(
                 self.out_dir, 
-                '{}-{}-coarse.PNG'.format(runner.iter, i+runner.rank)), im[:,:,::-1])
+                f'iter{runner.iter}-id{runner.rank+i}-coarse.png'), im[:,:,::-1])
             if outputs['fine'] is not None:
                 im = outputs['fine']['color_map'].reshape(self.im_shape)
                 im = 255 * im.detach().cpu().numpy()
                 # TODO: convert to video
                 cv2.imwrite(osp.join(
                     self.out_dir, 
-                    '{}-{}-fine.PNG'.format(runner.iter, i+runner.rank)), im[:,:,::-1])
+                    f'iter{runner.iter}-id{runner.rank+i}-fine.png'), im[:,:,::-1])
 
             loss += outputs['log_vars']['loss']
             psnr += outputs['log_vars']['psnr']

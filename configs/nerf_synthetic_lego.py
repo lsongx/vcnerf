@@ -36,21 +36,25 @@ model = dict(
         alpha_noise_std=1.0,
         inv_depth=False,
         use_dirs=True,
-        max_nb_rays=1024*3,))
+        white_bkgd=True,
+        max_nb_rays=1024,))
 
 # dataset settings
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=1,
+    workers_per_gpu=2,
     train=dict(
-        type='SyntheticDataset',
-        base_dir='./data/nerf/nerf_synthetic/lego', 
-        half_res=True,
-        batch_size=512,
-        white_bkgd=True,
-        precrop_frac=0.5,
-        testskip=8,
-        split='train'),
+        type='RepeatDataset',
+        dataset=dict(
+            type='SyntheticDataset',
+            base_dir='./data/nerf/nerf_synthetic/lego', 
+            half_res=True,
+            batch_size=1024,
+            white_bkgd=True,
+            precrop_frac=0.5,
+            testskip=8,
+            split='train'),
+        times=10),
     val=dict(
         type='SyntheticDataset',
         base_dir='./data/nerf/nerf_synthetic/lego', 
@@ -68,15 +72,15 @@ optimizer_config = dict(grad_clip=None)
 lr_config = dict(policy='Exp', gamma=0.1**((1/1000)*(1/250)), by_epoch=False) 
 runner = dict(type='EpochBasedRunner', max_epochs=20)
 # misc settings
-checkpoint_config = dict(interval=1, max_keep_ckpts=5)
+checkpoint_config = dict(interval=1, max_keep_ckpts=3)
 log_config = dict(
-    interval=500,
+    interval=30,
     hooks=[
         dict(type='TextLoggerHook'),
         dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
-    interval=1,
+    interval=2500,
     render_params=dict(
         n_samples=64,
         n_importance=128,
@@ -84,7 +88,14 @@ evaluation = dict(
         alpha_noise_std=0,
         inv_depth=False,
         use_dirs=True,
-        max_nb_rays=1024*2,))
+        white_bkgd=True,
+        max_nb_rays=1024*3,))
+param_adjust_hooks = [
+    dict(
+        type='DatasetParamAdjustHook',
+        param_name_adjust_iter_value = [
+            # ('precrop_frac', 0, 0.9),
+            ('precrop_frac', 500, 1),],)]
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './data/out'

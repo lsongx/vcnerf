@@ -3,10 +3,11 @@ import random
 import numpy as np
 import torch
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
-from mmcv.runner import (DistSamplerSeedHook, Fp16OptimizerHook, 
+from mmcv.runner import (DistSamplerSeedHook, Fp16OptimizerHook, obj_from_dict,
                          OptimizerHook, build_optimizer, build_runner)
 from mmcv.utils import build_from_cfg
 
+import vcnerf
 from vcnerf.core import DistEvalHook, EvalHook
 from vcnerf.datasets import build_dataloader, build_dataset
 from vcnerf.utils import get_root_logger
@@ -80,6 +81,8 @@ def train_renderer(model,
             meta=meta))
     # an ugly workaround to make .log and .log.json filenames the same
     runner.timestamp = timestamp
+    # we need to update datasets
+    runner.data_loaders = data_loaders
 
     # fp16 setting
     fp16_cfg = cfg.get('fp16', None)
@@ -111,6 +114,11 @@ def train_renderer(model,
         eval_hook = DistEvalHook if distributed else EvalHook
         runner.register_hook(
             eval_hook(val_dataloader, logger=logger, **eval_cfg))
+
+    for param_adjust_hook in cfg.get('param_adjust_hooks', []):
+        param_adjust_hook['logger'] = logger
+        runner.register_hook(
+            obj_from_dict(param_adjust_hook, vcnerf.core.hooks))
 
     if cfg.resume_from:
         runner.resume(cfg.resume_from)
