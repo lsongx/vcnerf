@@ -65,13 +65,13 @@ class EvalHook(Hook):
             im = 255 * im.detach().cpu().numpy()
             # TODO: convert to video
             cv2.imwrite(osp.join(
-                self.out_dir, f'iter{runner.iter}-id{i}-coarse.png'), im[:,:,::-1])
+                self.out_dir, f'iter{runner.iter+1}-id{i}-coarse.png'), im[:,:,::-1])
             if outputs['fine'] is not None:
                 im = outputs['fine']['color_map'].reshape(self.im_shape)
                 im = 255 * im.detach().cpu().numpy()
                 # TODO: convert to video
                 cv2.imwrite(osp.join(
-                    self.out_dir, f'iter{runner.iter}-id{i}-fine.png'), im[:,:,::-1])
+                    self.out_dir, f'iter{runner.iter+1}-id{i}-fine.png'), im[:,:,::-1])
 
             loss += outputs['log_vars']['loss']
             psnr += outputs['log_vars']['psnr']
@@ -141,14 +141,14 @@ class DistEvalHook(Hook):
             # TODO: convert to video
             cv2.imwrite(osp.join(
                 self.out_dir, 
-                f'iter{runner.iter}-id{runner.rank+i}-coarse.png'), im[:,:,::-1])
+                f'iter{runner.iter+1}-id{runner.rank+i}-coarse.png'), im[:,:,::-1])
             if outputs['fine'] is not None:
                 im = outputs['fine']['color_map'].reshape(self.im_shape)
                 im = 255 * im.detach().cpu().numpy()
                 # TODO: convert to video
                 cv2.imwrite(osp.join(
                     self.out_dir, 
-                    f'iter{runner.iter}-id{runner.rank+i}-fine.png'), im[:,:,::-1])
+                    f'iter{runner.iter+1}-id{runner.rank+i}-fine.png'), im[:,:,::-1])
 
             loss += outputs['log_vars']['loss']
             psnr += outputs['log_vars']['psnr']

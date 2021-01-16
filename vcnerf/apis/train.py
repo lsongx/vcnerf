@@ -119,6 +119,7 @@ def train_renderer(model,
         param_adjust_hook['logger'] = logger
         runner.register_hook(
             obj_from_dict(param_adjust_hook, vcnerf.core.hooks))
+    runner.register_hook(vcnerf.core.hooks.IterAdjustHook(logger))
 
     if cfg.resume_from:
         runner.resume(cfg.resume_from)

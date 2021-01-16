@@ -84,6 +84,7 @@ def parse_args():
 
 
 def main():
+    os.environ['MASTER_PORT'] = '29553'
     args = parse_args()
 
     cfg = Config.fromfile(args.config)

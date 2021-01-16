@@ -25,6 +25,7 @@ class NeRF(nn.Module):
         self.render_params = render_params
         self.sample_pdf = SamplePDF()
         self.fp16_enabled = False
+        self.iter = 0
 
         # sanity checks
         assert self.xyz_embedder.out_dims == coarse_field.xyz_emb_dims
@@ -173,6 +174,7 @@ class NeRF(nn.Module):
             z_samples = self.sample_pdf(
                 z_vals_mid, coarse_outputs['weights'][..., 1:-1], n_importance, not perturb)
             z_vals_fine, indices = torch.sort(torch.cat([z_vals, z_samples], dim=-1), dim=-1)
+            z_vals_fine = z_vals_fine.detach()
 
              # TODO: double check
             if use_dirs:
