@@ -47,21 +47,21 @@ data = dict(
         type='RepeatDataset',
         dataset=dict(
             type='SyntheticDataset',
-            base_dir='./data/nerf/nerf_synthetic/lego', 
+            base_dir='~/data/3d/nerf/nerf_synthetic/lego', 
             half_res=True,
             batch_size=1024*2,
             white_bkgd=True,
-            precrop_frac=0.5,
+            # precrop_frac=0.5,
             testskip=8,
             split='train'),
         times=40),
     val=dict(
         type='SyntheticDataset',
-        base_dir='./data/nerf/nerf_synthetic/lego', 
+        base_dir='~/data/3d/nerf/nerf_synthetic/lego', 
         half_res=True,
         batch_size=-1,
         white_bkgd=True,
-        precrop_frac=0.5,
+        # precrop_frac=0.5,
         testskip=8,
         split='val'))
 
@@ -69,7 +69,8 @@ data = dict(
 optimizer = dict(type='Adam', lr=5e-4, betas=(0.9, 0.999))
 optimizer_config = dict(grad_clip=None)
 # learning policy
-lr_config = dict(policy='Exp', gamma=0.1**(1/50000), by_epoch=False) 
+# lr_config = dict(policy='Exp', gamma=0.1**(1/50000), by_epoch=False) 
+lr_config = dict(policy='Step', step=[40,80,120,160,180], gamma=0.5, by_epoch=True)
 runner = dict(type='EpochBasedRunner', max_epochs=200)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=3)

@@ -104,9 +104,9 @@ class NeRF(nn.Module):
 
     @auto_fp16()
     def forward_render(self,
-                       rays_ori, rays_dir, rays_color, ndc_rays_ori, ndc_rays_dir, # loader output
+                       rays_ori, rays_dir, rays_color, # loader output
                        n_samples, n_importance, perturb, alpha_noise_std, inv_depth, # render param
-                       use_dirs, max_nb_rays, ndc=False, near=0.0, far=1.0, white_bkgd=False):
+                       use_dirs, max_nb_rays, near=0.0, far=1.0, white_bkgd=False):
 
         # near, far: [B] or [B, H, W]
         near = near * torch.ones(rays_ori.shape[:-1], dtype=torch.float32, device=rays_ori.device)
@@ -134,15 +134,9 @@ class NeRF(nn.Module):
         else:
             directions = None
         
-        # import pdb; pdb.set_trace()
-        if ndc:
-            # points in space to evaluate model at
-            points = ndc_rays_ori[..., None, :] + ndc_rays_dir[..., None, :] * \
-                z_vals[..., :, None]  # [B, n_samples, 3] or [B, H, W, n_samples, 3]
-        else:
-            # points in space to evaluate model at
-            points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
-                z_vals[..., :, None]  # [B, n_samples, 3] or [B, H, W, n_samples, 3]
+        # points in space to evaluate model at
+        points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
+            z_vals[..., :, None]  # [B, n_samples, 3] or [B, H, W, n_samples, 3]
 
         # if use_dirs:
         #     directions = F.normalize(rays_dir, p=2, dim=-1)
@@ -165,7 +159,7 @@ class NeRF(nn.Module):
         coarse_outputs = raw2outputs(coarse_alphas, 
                                      coarse_colors, 
                                      z_vals, 
-                                     ndc_rays_dir if ndc else rays_dir,
+                                     rays_dir,
                                      alpha_noise_std,
                                      white_bkgd)
 
@@ -182,14 +176,9 @@ class NeRF(nn.Module):
             else:
                 directions = None
 
-            if ndc:
-                # points in space to evaluate model at
-                points = ndc_rays_ori[..., None, :] + ndc_rays_dir[..., None, :] * \
-                    z_vals_fine[..., :, None]  # [B, n_importance, 3]
-            else:
-                # points in space to evaluate model at
-                points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
-                    z_vals_fine[..., :, None]  # [B, n_importance, 3]
+            # points in space to evaluate model at
+            points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
+                z_vals_fine[..., :, None]  # [B, n_importance, 3]
 
             # if use_dirs:
             #     directions = F.normalize(rays_dir, p=2, dim=-1)
@@ -215,7 +204,7 @@ class NeRF(nn.Module):
             fine_outputs = raw2outputs(fine_alphas, 
                                        fine_colors, 
                                        z_vals_fine, 
-                                       ndc_rays_dir if ndc else rays_dir,
+                                       rays_dir,
                                        alpha_noise_std,
                                        white_bkgd)
         else:
@@ -232,7 +221,7 @@ class NeRF(nn.Module):
         assert points.shape[0] == directions.shape[0], (
             f'points: {points.shape}, directions: {directions.shape}')
         nb_rays = points.shape[0]
-        if nb_rays <= max_nb_rays:
+        if nb_rays <= max_nb_rays and self.training:
             return self.forward_points(points, directions, run_coarse, run_fine)
         else:
             outputs = []
@@ -311,21 +300,3 @@ class NeRF(nn.Module):
     def val_step(self, data, optimizer, **kwargs):
         return self.train_step(data, optimizer, **kwargs)
 
-
-# if __name__ == '__main__':
-#     from modules.field import Field
-#     from modules.embedder import Embedder
-
-#     coarse_field = Field()
-#     fine_field = Field()
-#     xyz_embedder = Embedder(3, 10)
-#     dir_embedder = Embedder(3, 4)
-#     model = NeRF(xyz_embedder, coarse_field, dir_embedder, fine_field)
-
-#     points = torch.rand((2, 3))
-#     directions = torch.rand((2, 3))
-#     coarse_alphas, coarse_colors, fine_alphas, fine_colors = model(points, directions)
-#     print('coarse alphas:', coarse_alphas.shape)
-#     print('fine alphas:', fine_alphas.shape)
-#     print('coarse colors:', coarse_colors.shape)
-#     print('fine colors:', fine_colors.shape)

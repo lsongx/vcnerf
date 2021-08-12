@@ -68,7 +68,7 @@ class SyntheticDataset(object):
                  half_res,
                  batch_size,
                  white_bkgd=True,
-                 precrop_frac=0.5,
+                 precrop_frac=1,
                  testskip=8,):
         super().__init__()
         self.logger = get_root_logger()
@@ -133,7 +133,7 @@ class SyntheticDataset(object):
         self.poses = torch.tensor(self.poses)
 
     def __len__(self):
-        return len(self.imgs)
+        return len(self.poses)
 
     def __getitem__(self, idx):
         target = self.imgs[idx]
@@ -144,8 +144,8 @@ class SyntheticDataset(object):
             rays_color = target.view([-1,3])  # (N, 3)
             return {'rays_ori': rays_ori.view([-1,3]), 
                     'rays_dir': rays_dir.view([-1,3]), 
-                    'rays_color': rays_color, 'ndc_rays_ori': 0, 
-                    'ndc_rays_dir': 0, 'near': self.near, 'far': self.far}
+                    'rays_color': rays_color, 
+                    'near': self.near, 'far': self.far}
 
         if self.precrop_frac < 1:
             dH = int(self.h//2 * self.precrop_frac)
@@ -168,7 +168,6 @@ class SyntheticDataset(object):
         rays_color = target[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
 
         return {'rays_ori': rays_ori, 'rays_dir': rays_dir, 
-                'rays_color': rays_color, 'ndc_rays_ori': 0, 
-                'ndc_rays_dir': 0, 'near': self.near, 'far': self.far}
+                'rays_color': rays_color, 'near': self.near, 'far': self.far}
 
 

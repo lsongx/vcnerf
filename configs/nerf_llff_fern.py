@@ -36,65 +36,59 @@ model = dict(
         alpha_noise_std=1.0,
         inv_depth=False,
         use_dirs=True,
-        max_nb_rays=1024*3,
-        ndc=True))
+        max_nb_rays=1024*3,))
 
 # dataset settings
 data = dict(
-    samples_per_gpu=1024,
-    workers_per_gpu=2,
-    train=dict(
-        type='NeRFDataset',
-        loader=dict(
-            type='LLFFLoader',
-            colmap_dir='./data/nerf/nerf_llff_data/fern/',
-            im_dir='./data/nerf/nerf_llff_data/fern/images/',
-            bound_factor=0.75,
-            center_poses=True,
-            spherify_poses=False,
-            factor=4,
-            ndc=True),
-        split='train', 
-        holdout=8),
+    samples_per_gpu=1,
+    workers_per_gpu=0,
+    train=dict(        
+        type='RepeatDataset',
+        dataset=dict(
+            type='LLFFDataset',
+            datadir='~/data/3d/nerf/nerf_llff_data/fern', 
+            factor=8, 
+            batch_size=1024*2,
+            split='train', 
+            spherify=False, 
+            no_ndc=True, 
+            holdout=-1),
+        times=100),
     val=dict(
-        type='NeRFDataset',
-        loader=dict(
-            type='LLFFLoader',
-            colmap_dir='./data/nerf/nerf_llff_data/fern/',
-            im_dir='./data/nerf/nerf_llff_data/fern/images/',
-            bound_factor=0.75,
-            center_poses=True,
-            spherify_poses=False,
-            factor=4,
-            ndc=True),
+        type='LLFFDataset',
+        datadir='~/data/3d/nerf/nerf_llff_data/fern', 
+        factor=8, 
+        batch_size=-1,
         split='val', 
-        holdout=8))
+        spherify=False, 
+        no_ndc=True, 
+        holdout=8),)
 
 # optimizer
 optimizer = dict(type='Adam', lr=5e-4, betas=(0.9, 0.999))
 optimizer_config = dict(grad_clip=None)
 # learning policy
-lr_config = dict(policy='Exp', gamma=0.1**((1/1000)*(1/250)), by_epoch=False) 
-runner = dict(type='EpochBasedRunner', max_epochs=20)
+# lr_config = dict(policy='Exp', gamma=0.1**((1/1000)*(1/250)), by_epoch=False) 
+lr_config = dict(policy='Step', step=[40,80,120,160,180], gamma=0.5, by_epoch=True)
+runner = dict(type='EpochBasedRunner', max_epochs=200)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 log_config = dict(
-    interval=500,
+    interval=100,
     hooks=[
         dict(type='TextLoggerHook'),
         dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
     interval=2500, # every 2500 iterations
-    render_cfg=dict(
+    render_params=dict(
         n_samples=64,
         n_importance=128,
         perturb=False,
         alpha_noise_std=0,
         inv_depth=False,
         use_dirs=True,
-        max_nb_rays=1024*2,
-        ndc=True))
+        max_nb_rays=1024*2,))
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './data/out'

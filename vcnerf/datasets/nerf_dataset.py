@@ -75,19 +75,3 @@ class NeRFDataset(Dataset):
                 'rays_color': rays_color, 'ndc_rays_ori': 0, 
                 'ndc_rays_dir': 0,}
 
-
-# if __name__ == '__main__':
-#     colmap_dir = '/mnt/datasets/NERF/nerf_llff_data/fern/'
-#     im_dir = '/mnt/datasets/NERF/nerf_llff_data/fern/' + 'imaGes'.lower()
-    
-#     nerf_loader = NeRFLoader(colmap_dir, im_dir, factor=8)
-#     train_dataset = NeRFDataset(nerf_loader, 'train', holdout=8)
-#     train_dataloader = DataLoader(train_dataset, batch_size=4096, shuffle=False, collate_fn=train_dataset.collater)
-
-#     rays_ori, rays_dir, rays_color, ndc_rays_ori, ndc_rays_dir = next(iter(train_dataloader))
-#     import pdb; pdb.set_trace()
-#     print('rays_ori:', rays_ori.shape)
-#     print('rays_dir:', rays_dir.shape)
-#     print('rays_color:', rays_color.shape)
-#     print('ndc_rays_ori:', ndc_rays_ori.shape)
-#     print('ndc_rays_dir:', ndc_rays_dir.shape)
