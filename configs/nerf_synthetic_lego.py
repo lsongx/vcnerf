@@ -49,7 +49,7 @@ data = dict(
             type='SyntheticDataset',
             base_dir='~/data/3d/nerf/nerf_synthetic/lego', 
             half_res=True,
-            batch_size=1024*2,
+            batch_size=1024*3,
             white_bkgd=True,
             # precrop_frac=0.5,
             testskip=8,
@@ -75,10 +75,10 @@ runner = dict(type='EpochBasedRunner', max_epochs=200)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=3)
 log_config = dict(
-    interval=30,
+    interval=200,
     hooks=[
         dict(type='TextLoggerHook'),
-        dict(type='TensorboardLoggerHook', log_dir='./logs')
+        # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
     interval=2500,

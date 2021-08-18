@@ -48,11 +48,11 @@ data = dict(
             type='LLFFDataset',
             datadir='~/data/3d/nerf/nerf_llff_data/fern', 
             factor=8, 
-            batch_size=1024*2,
+            batch_size=1024*3,
             split='train', 
             spherify=False, 
             no_ndc=True, 
-            holdout=-1),
+            holdout=8),
         times=100),
     val=dict(
         type='LLFFDataset',
@@ -74,10 +74,10 @@ runner = dict(type='EpochBasedRunner', max_epochs=200)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 log_config = dict(
-    interval=100,
+    interval=200,
     hooks=[
         dict(type='TextLoggerHook'),
-        dict(type='TensorboardLoggerHook', log_dir='./logs')
+        # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
     interval=2500, # every 2500 iterations

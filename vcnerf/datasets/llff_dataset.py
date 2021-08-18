@@ -57,13 +57,14 @@ class LLFFDataset:
                  split, 
                  spherify, 
                  no_ndc, 
-                 holdout,):
+                 holdout,
+                 llff_data_param={}):
         self.logger = get_root_logger()
         self.batch_size = batch_size
         self.no_ndc = no_ndc
         datadir = osp.expanduser(datadir)
         images, poses, bds, render_poses, i_test = load_llff_data(
-            datadir, factor, recenter=True, bd_factor=.75, spherify=spherify)
+            datadir, factor, recenter=True, bd_factor=.75, spherify=spherify, **llff_data_param)
         self.hwf = poses[0, :3, -1]
         self.h = int(self.hwf[0])
         self.w = int(self.hwf[1])
@@ -76,7 +77,7 @@ class LLFFDataset:
             i_test = [i_test]
 
         if holdout > 0:
-            self.logger.info(f'Auto LLFF holdout: {holdout}')
+            self.logger.info(f'Hold out overwrite. Auto LLFF holdout: {holdout}')
             i_test = np.arange(images.shape[0])[::holdout]
 
         i_val = i_test
@@ -95,6 +96,7 @@ class LLFFDataset:
             self.near = 0.
             self.far = 1.
         self.logger.info(f'NEAR {self.near} FAR {self.far}')
+        self.logger.info(f'split {split} idx: {all_idx}')
 
         self.imgs = torch.tensor(images[all_idx])
         self.poses = torch.tensor(self.poses[all_idx])

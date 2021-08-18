@@ -163,7 +163,7 @@ class NeRF(nn.Module):
                                      alpha_noise_std,
                                      white_bkgd)
 
-        if n_importance > 0:
+        if n_importance>0 and self.fine_field is not None:
             z_vals_mid = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
             z_samples = self.sample_pdf(
                 z_vals_mid, coarse_outputs['weights'][..., 1:-1], n_importance, not perturb)

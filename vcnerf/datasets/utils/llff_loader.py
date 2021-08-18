@@ -112,11 +112,11 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
         else:
             return imageio.imread(f)
         
-    imgs = imgs = [imread(f)[...,:3]/255. for f in imgfiles]
+    imgs = [imread(f)[...,:3]/255. for f in imgfiles]
     imgs = np.stack(imgs, -1)  
     
     print('Loaded image data', imgs.shape, poses[:,-1,0])
-    return poses, bds, imgs
+    return poses, bds, imgs, imgfiles
 
     
             
@@ -157,11 +157,14 @@ def render_path_spiral(c2w, up, rads, focal, zdelta, zrate, rots, N):
     hwf = c2w[:,4:5]
     
     for theta in np.linspace(0., 2. * np.pi * rots, N+1)[:-1]:
-        c = np.dot(c2w[:3,:4], np.array([np.cos(theta), -np.sin(theta), -np.sin(theta*zrate), 1.]) * rads) 
+        c = np.dot(c2w[:3,:4], np.array([np.cos(theta), -np.sin(theta), -np.sin(theta*zrate), 1.]) * rads)
+        c[0] -= 0.5
+        # focal *= 0.5
+        up=[1,0,0]
         z = normalize(c - np.dot(c2w[:3,:4], np.array([0,0,-focal, 1.])))
         render_poses.append(np.concatenate([viewmatrix(z, up, c), hwf], 1))
     return render_poses
-    
+
 
 
 def recenter_poses(poses):
@@ -241,10 +244,19 @@ def spherify_poses(poses, bds):
     return poses_reset, new_poses, bds
     
 
-def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=False, path_zflat=False):
+def load_llff_data(basedir, 
+                   factor=8, 
+                   recenter=True, 
+                   bd_factor=.75, 
+                   spherify=False, 
+                   path_zflat=False,
+                   percentile=90,
+                   N_views=120,
+                   N_rots=2,
+                   zrate=0.5,):
     logger = get_root_logger()
 
-    poses, bds, imgs = _load_data(basedir, factor=factor) # factor=8 downsamples original imgs by 8x
+    poses, bds, imgs, imgfiles = _load_data(basedir, factor=factor) # factor=8 downsamples original imgs by 8x
     logger.info(f'Loaded {basedir} {bds.min()} {bds.max()}')
     
     # Correct rotation matrix ordering and move variable dim to axis 0
@@ -285,10 +297,8 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
         shrink_factor = .8
         zdelta = close_depth * .2
         tt = poses[:,:3,3] # ptstocam(poses[:3,3,:].T, c2w).T
-        rads = np.percentile(np.abs(tt), 90, 0)
+        rads = np.percentile(np.abs(tt), percentile, 0)
         c2w_path = c2w
-        N_views = 120
-        N_rots = 2
         if path_zflat:
 #             zloc = np.percentile(tt, 10, 0)[2]
             zloc = -close_depth * .1
@@ -298,7 +308,7 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
             N_views/=2
 
         # Generate poses for spiral path
-        render_poses = render_path_spiral(c2w_path, up, rads, focal, zdelta, zrate=.5, rots=N_rots, N=N_views)
+        render_poses = render_path_spiral(c2w_path, up, rads, focal, zdelta, zrate=zrate, rots=N_rots, N=N_views)
         
         
     render_poses = np.array(render_poses).astype(np.float32)
