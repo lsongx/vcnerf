@@ -106,7 +106,7 @@ class NeRF(nn.Module):
     def forward_render(self,
                        rays_ori, rays_dir, rays_color, # loader output
                        n_samples, n_importance, perturb, alpha_noise_std, inv_depth, # render param
-                       use_dirs, max_nb_rays, near=0.0, far=1.0, white_bkgd=False):
+                       use_dirs, max_rays_num, near=0.0, far=1.0, white_bkgd=False):
 
         # near, far: [B] or [B, H, W]
         near = near * torch.ones(rays_ori.shape[:-1], dtype=torch.float32, device=rays_ori.device)
@@ -155,7 +155,7 @@ class NeRF(nn.Module):
                                                                directions, 
                                                                run_coarse=True, 
                                                                run_fine=False, 
-                                                               max_nb_rays=max_nb_rays)[:2]
+                                                               max_rays_num=max_rays_num)[:2]
         coarse_outputs = raw2outputs(coarse_alphas, 
                                      coarse_colors, 
                                      z_vals, 
@@ -193,12 +193,12 @@ class NeRF(nn.Module):
             
             # Evaluates the model at the points
             # fine_alphas0, fine_colors0 = fine_alphas, fine_colors
-            max_nb_rays = int(max_nb_rays * n_samples / (n_samples + n_importance))
+            max_rays_num = int(max_rays_num * n_samples / (n_samples + n_importance))
             fine_alphas, fine_colors = self.forward_batchified(points, 
                                                                directions, 
                                                                run_coarse=False, 
                                                                run_fine=True,
-                                                               max_nb_rays=max_nb_rays)[2:]
+                                                               max_rays_num=max_rays_num)[2:]
             # fine_alphas = torch.cat([fine_alphas0, fine_alphas], dim=-2)  # [B, n_samples + n_importance, 1]
             # fine_colors = torch.cat([fine_colors0, fine_colors], dim=-2)  # [B, n_samples + n_importance, 3]
             fine_outputs = raw2outputs(fine_alphas, 
@@ -217,16 +217,16 @@ class NeRF(nn.Module):
                            directions, 
                            run_coarse, 
                            run_fine, 
-                           max_nb_rays,):
+                           max_rays_num,):
         assert points.shape[0] == directions.shape[0], (
             f'points: {points.shape}, directions: {directions.shape}')
         nb_rays = points.shape[0]
-        if nb_rays <= max_nb_rays and self.training:
+        if nb_rays <= max_rays_num and self.training:
             return self.forward_points(points, directions, run_coarse, run_fine)
         else:
             outputs = []
             start = 0
-            end = max_nb_rays
+            end = max_rays_num
             while start < nb_rays:
                 assert start < end, 'start >= end ({:d}, {:d})'.format(start, end)
                 output = self.forward_points(points[start: end, ...], 
@@ -234,8 +234,8 @@ class NeRF(nn.Module):
                                              run_coarse, 
                                              run_fine,)
                 outputs.append(output)
-                start += max_nb_rays
-                end = min(end + max_nb_rays, nb_rays)
+                start += max_rays_num
+                end = min(end + max_rays_num, nb_rays)
             
             alphas_colors = []
             for i, out in enumerate(zip(*outputs)):

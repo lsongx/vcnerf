@@ -37,7 +37,7 @@ model = dict(
         inv_depth=False,
         use_dirs=True,
         white_bkgd=True,
-        max_nb_rays=1024,))
+        max_rays_num=1024,))
 
 # dataset settings
 data = dict(
@@ -90,7 +90,7 @@ evaluation = dict(
         inv_depth=False,
         use_dirs=True,
         white_bkgd=True,
-        max_nb_rays=1024*3,))
+        max_rays_num=1024*3,))
 param_adjust_hooks = [
     dict(
         type='DatasetParamAdjustHook',

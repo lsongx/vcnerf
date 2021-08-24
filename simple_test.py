@@ -18,7 +18,7 @@ dataset = build_dataset(cfg.data.train)
 dataset.dataset.batch_size = -1
 model = build_renderer(cfg.model).cuda()
 model.load_state_dict(torch.load(state_dict)['state_dict'])
-cfg.evaluation.render_params.max_nb_rays = 512
+cfg.evaluation.render_params.max_rays_num = 512
 h = val_dataset.h
 w = val_dataset.w
 

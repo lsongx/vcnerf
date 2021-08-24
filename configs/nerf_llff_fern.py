@@ -36,7 +36,7 @@ model = dict(
         alpha_noise_std=1.0,
         inv_depth=False,
         use_dirs=True,
-        max_nb_rays=1024*3,))
+        max_rays_num=1024*3,))
 
 # dataset settings
 data = dict(
@@ -88,7 +88,7 @@ evaluation = dict(
         alpha_noise_std=0,
         inv_depth=False,
         use_dirs=True,
-        max_nb_rays=1024*2,))
+        max_rays_num=1024*2,))
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './data/out'

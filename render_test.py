@@ -19,7 +19,7 @@ dataset = build_dataset(cfg.data.val)
 dataset.poses = dataset.render_poses
 model = build_renderer(cfg.model).cuda()
 model.load_state_dict(torch.load(state_dict)['state_dict'])
-cfg.evaluation.render_params.max_nb_rays = 512
+cfg.evaluation.render_params.max_rays_num = 512
 h = dataset.h
 w = dataset.w
 
