@@ -42,7 +42,7 @@ class DynamicNeRF(NeRF):
                        directions=None, 
                        run_coarse=True, 
                        run_fine=True,
-                       **kwarGs):
+                       **kwargs):
         shape = tuple(points.shape[:-1])  # [B, n_points]
         # [B, 3] -> [B, n_points, 3]
         directions = directions[..., None, :].expand_as(points)
@@ -53,7 +53,7 @@ class DynamicNeRF(NeRF):
         if not run_coarse and not run_fine:
             raise ValueError('One or both run_coarse and run_fine should be True')
 
-        t = kwarGs['t']
+        t = kwargs['t']
         t_embeds = self.t_embedder(t)
         xyz_embeds = self.xyz_embedder(points)
         if self.dir_embedder is None:

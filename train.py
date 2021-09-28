@@ -68,6 +68,7 @@ def parse_args():
         help='job launcher')
     parser.add_argument('--use_fp16', type=int, default=0)
     parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument('--port', type=str, default='29553')
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -84,8 +85,8 @@ def parse_args():
 
 
 def main():
-    os.environ['MASTER_PORT'] = '29553'
     args = parse_args()
+    os.environ['MASTER_PORT'] = args.port
 
     cfg = Config.fromfile(args.config)
     if not args.use_fp16:

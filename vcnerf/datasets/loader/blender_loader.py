@@ -8,7 +8,7 @@ import cv2
 import imageio as imio
 import numpy as np
 
-from vcnerf.utils import get_root_logger as get_root_loGGer
+from vcnerf.utils import get_root_logger as get_root_logger
 from ..utils import collect_rays, center_poses
 from ..builder import LOADERS
 
@@ -17,14 +17,14 @@ from ..builder import LOADERS
 class BlenderLoader(object):
     def __init__(self, root_dir, bound_factor=0.75, center_poses=True, spherify_poses=False, ndc=True):
         super().__init__()
-        self.loGGer = get_root_loGGer()
+        self.logger = get_root_logger()
         self.root_dir = os.path.expanduser(root_dir)
         self.bound_factor = bound_factor
         self.center_poses = center_poses
         self.spherify_poses = spherify_poses
         self.ndc = ndc
 
-        self.loGGer.info('Start to load data...')
+        self.logger.info('Start to load data...')
 
         cam_poses, bounds, im_array, focal, H, W = self._load_data()
         self.cam_poses = cam_poses
@@ -32,18 +32,18 @@ class BlenderLoader(object):
         self.bounds = bounds
         self.im_array = im_array
 
-        self.loGGer.info(f'im_array: {self.im_array.shape}')
-        self.loGGer.info(f'cam poses: {self.cam_poses.shape}')
-        self.loGGer.info(f'bounds: {self.bounds.shape}')
+        self.logger.info(f'im_array: {self.im_array.shape}')
+        self.logger.info(f'cam poses: {self.cam_poses.shape}')
+        self.logger.info(f'bounds: {self.bounds.shape}')
 
         rays_ori, rays_dir, rays_color = self._collect_rays(H, W, focal)
         self.rays_ori = rays_ori
         self.rays_dir = rays_dir
         self.rays_color = rays_color
-        self.loGGer.info(f'rays_ori: {self.rays_ori.shape}')
-        self.loGGer.info(f'rays_dir: {self.rays_dir.shape}')
-        self.loGGer.info(f'rays_color: {self.rays_color.shape}')
-        self.loGGer.info('Finish to load data...')
+        self.logger.info(f'rays_ori: {self.rays_ori.shape}')
+        self.logger.info(f'rays_dir: {self.rays_dir.shape}')
+        self.logger.info(f'rays_color: {self.rays_color.shape}')
+        self.logger.info('Finish to load data...')
 
         self.H = H
         self.W = W
@@ -152,7 +152,7 @@ class BlenderLoader(object):
 
         im_paths = [osp.join(self.root_dir, n) for n in im_names]
         im_array = [imread(p)[..., :3] / 255 for p in im_paths]
-        im_array = np.stack(im_array, 0)  # [#im, heiGht, width, 3]
+        im_array = np.stack(im_array, 0)  # [#im, height, width, 3]
         return im_array
 
     def _collect_rays(self, H, W, focal):

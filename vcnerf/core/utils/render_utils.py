@@ -61,7 +61,7 @@ def raw2outputs(alphas, colors, z_vals, rays_dir, alpha_noise_std, white_bkgd):
     # Sum of weights along each ray. This value is in [0, 1] up to numerical error.
     acc_map = torch.sum(weights, dim=-1)
 
-    # To composite onto a white backGround, use the accumulated alpha map
+    # To composite onto a white background, use the accumulated alpha map
     if white_bkgd:
         color_map = color_map + (1 - acc_map[..., None]) 
 
@@ -103,14 +103,14 @@ class SamplePDF(torch.nn.Module):
         indices = torch.searchsorted(cdf.detach(), t_vals)
         lower = torch.max(torch.zeros_like(indices - 1), indices - 1)
         upper = torch.min((cdf.shape[-1] - 1) * torch.ones_like(indices), indices)
-        indices_G = torch.stack([lower, upper], -1)  # [B, n_importance, 2]
+        indices_g = torch.stack([lower, upper], -1)  # [B, n_importance, 2]
 
-        matched_shape = [indices_G.shape[0], indices_G.shape[1], cdf.shape[-1]]
-        cdf_G = torch.gather(cdf.unsqueeze(1).expand(matched_shape), 2, indices_G)
-        bins_G = torch.gather(bins.unsqueeze(1).expand(matched_shape), 2, indices_G)
+        matched_shape = [indices_g.shape[0], indices_g.shape[1], cdf.shape[-1]]
+        cdf_g = torch.gather(cdf.unsqueeze(1).expand(matched_shape), 2, indices_g)
+        bins_g = torch.gather(bins.unsqueeze(1).expand(matched_shape), 2, indices_g)
 
-        denom = (cdf_G[...,1] - cdf_G[...,0])
+        denom = (cdf_g[...,1] - cdf_g[...,0])
         denom = torch.where(denom < 1e-5, torch.ones_like(denom), denom)
-        t = (t_vals - cdf_G[...,0])/denom
-        samples = bins_G[...,0] + t * (bins_G[...,1]-bins_G[...,0])
+        t = (t_vals - cdf_g[...,0])/denom
+        samples = bins_g[...,0] + t * (bins_g[...,1]-bins_g[...,0])
         return samples

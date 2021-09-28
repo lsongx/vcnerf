@@ -34,8 +34,7 @@ model = dict(
         n_importance=128,
         perturb=True,
         alpha_noise_std=1.0,
-        # inv_depth=False,
-        inv_depth=True,
+        inv_depth=False,
         use_dirs=True,
         max_rays_num=1024*3,))
 
@@ -46,34 +45,38 @@ data = dict(
     train=dict(        
         type='RepeatDataset',
         dataset=dict(
-            type='LLFFDataset',
-            datadir='~/data/3d/nerf/nerf_llff_data/fern', 
-            factor=8, 
-            batch_size=1024*3,
-            split='train', 
-            spherify=False, 
-            no_ndc=True, 
-            holdout=8),
+            type='StanfordLFDataset',
+            base_dir='~/data/3d/StanfordLF/lego-knights/rectified', 
+            pixel_move=[-240,150],
+            grid=1,
+            downsample=2,
+            # downsample=4,
+            scale=1024,
+            batch_size=int(1024*3),
+            keep_idx=['_00_00_', '_00_16_', '_08_08_', '_16_00_', '_16_16_'],
+            # keep_idx=['_00_00_', '_00_16_', '_16_00_', '_16_16_'],
+            perturb=True,
+            split='train',),
         times=100),
     val=dict(
-        type='LLFFDataset',
-        datadir='~/data/3d/nerf/nerf_llff_data/fern', 
-        factor=8, 
+        type='StanfordLFDataset',
+        base_dir='~/data/3d/StanfordLF/lego-knights/rectified', 
+        pixel_move=[-240,150],
+        grid=1,
+        downsample=2,
+        # downsample=4,
+        scale=1024,
         batch_size=-1,
-        split='val', 
-        spherify=False, 
-        no_ndc=True, 
-        holdout=8),)
+        keep_idx=['_04_08_', '_10_08_'],
+        split='val',),)
 
 # optimizer
 optimizer = dict(type='Adam', lr=5e-4, betas=(0.9, 0.999))
 optimizer_config = dict(grad_clip=None)
 # learning policy
 # lr_config = dict(policy='Exp', gamma=0.1**((1/1000)*(1/250)), by_epoch=False) 
-# lr_config = dict(policy='Step', step=[40,80,120,160,180], gamma=0.5, by_epoch=True)
-# runner = dict(type='EpochBasedRunner', max_epochs=200)
-lr_config = dict(policy='Step', step=[20,40,60,80,90], gamma=0.5, by_epoch=True)
-runner = dict(type='EpochBasedRunner', max_epochs=100)
+lr_config = dict(policy='Step', step=[40,80,120,160,180], gamma=0.5, by_epoch=True)
+runner = dict(type='EpochBasedRunner', max_epochs=200)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 log_config = dict(
@@ -89,8 +92,7 @@ evaluation = dict(
         n_importance=128,
         perturb=False,
         alpha_noise_std=0,
-        # inv_depth=False,
-        inv_depth=True,
+        inv_depth=False,
         use_dirs=True,
         max_rays_num=1024*2,))
 dist_params = dict(backend='nccl')

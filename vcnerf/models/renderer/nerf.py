@@ -107,17 +107,19 @@ class NeRF(nn.Module):
                        rays_ori, rays_dir, rays_color, # loader output
                        n_samples, n_importance, perturb, alpha_noise_std, inv_depth, # render param
                        use_dirs, max_rays_num, near=0.0, far=1.0, white_bkgd=False):
+        dtype = rays_dir.dtype
+        device = rays_ori.device
+        base_shape = list(rays_ori.shape[:-1])
 
-        # near, far: [B] or [B, H, W]
-        near = near * torch.ones(rays_ori.shape[:-1], dtype=torch.float32, device=rays_ori.device)
-        far = far * torch.ones(rays_ori.shape[:-1], dtype=torch.float32, device=rays_ori.device)
-        t_vals = torch.linspace(0, 1, n_samples, dtype=torch.float32, device=rays_ori.device)
         if not inv_depth:
-            # z_vals: [B, n_samples] or [B, H, W, n_samples]
-            z_vals = near[..., None] * (1 - t_vals) + far[..., None] * t_vals
+            z_vals = torch.linspace(
+                near, far, n_samples, 
+                dtype=dtype, device=device).expand([*base_shape, n_samples])
         else:
-            z_vals = 1/(1 / near[..., None] * (1 - t_vals) + 1 / far[..., None] * t_vals)
-        
+            z_vals = 1/torch.linspace(
+                1, near/far, n_samples, 
+                dtype=dtype, device=device).expand([*base_shape, n_samples])*near
+
         # Perturbs points coordinates
         if perturb:
             # Gets intervals
@@ -125,7 +127,7 @@ class NeRF(nn.Module):
             upper = torch.cat([mid_points, z_vals[..., -1:]], -1)
             lower = torch.cat([z_vals[..., :1], mid_points], -1)
             # stratified samples in those intervals
-            t_rand = torch.rand(z_vals.shape, dtype=torch.float32, device=rays_ori.device)
+            t_rand = torch.rand(z_vals.shape, dtype=dtype, device=device)
             z_vals = lower + (upper - lower) * t_rand
         
         # TODO: double check
@@ -137,17 +139,6 @@ class NeRF(nn.Module):
         # points in space to evaluate model at
         points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
             z_vals[..., :, None]  # [B, n_samples, 3] or [B, H, W, n_samples, 3]
-
-        # if use_dirs:
-        #     directions = F.normalize(rays_dir, p=2, dim=-1)
-        #     # points in space to evaluate model at
-        #     points = ndc_rays_ori[..., None, :] + ndc_rays_dir[..., None, :] * \
-        #         z_vals[..., :, None]  # [B, n_samples, 3] or [B, H, W, n_samples, 3]
-        # else:
-        #     directions = None
-        #     # points in space to evaluate model at
-        #     points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
-        #         z_vals[..., :, None]  # [B, n_samples, 3] or [B, H, W, n_samples, 3]
 
         # Evaluates the model at the points
         # coarse_alphas, coarse_colors = run_model(model, points, directions, run_coarse=True, run_fine=False)[:2]
@@ -180,17 +171,6 @@ class NeRF(nn.Module):
             points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
                 z_vals_fine[..., :, None]  # [B, n_importance, 3]
 
-            # if use_dirs:
-            #     directions = F.normalize(rays_dir, p=2, dim=-1)
-            #     # points in space to evaluate model at
-            #     points = ndc_rays_ori[..., None, :] + ndc_rays_dir[..., None, :] * \
-            #         z_vals_fine[..., :, None]  # [B, n_importance, 3]
-            # else:
-            #     directions = None
-            #     # points in space to evaluate model at
-            #     points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
-            #         z_vals_fine[..., :, None]  # [B, n_importance, 3]
-            
             # Evaluates the model at the points
             # fine_alphas0, fine_colors0 = fine_alphas, fine_colors
             max_rays_num = int(max_rays_num * n_samples / (n_samples + n_importance))
@@ -199,8 +179,6 @@ class NeRF(nn.Module):
                                                                run_coarse=False, 
                                                                run_fine=True,
                                                                max_rays_num=max_rays_num)[2:]
-            # fine_alphas = torch.cat([fine_alphas0, fine_alphas], dim=-2)  # [B, n_samples + n_importance, 1]
-            # fine_colors = torch.cat([fine_colors0, fine_colors], dim=-2)  # [B, n_samples + n_importance, 3]
             fine_outputs = raw2outputs(fine_alphas, 
                                        fine_colors, 
                                        z_vals_fine, 
