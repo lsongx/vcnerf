@@ -6,9 +6,10 @@ from ..builder import EMBEDDER
 
 @EMBEDDER.register_module()
 class BaseEmbedder(object):
-    def __init__(self, in_dims, nb_freqs, include_input=True):
+    def __init__(self, in_dims, nb_freqs, scale=1, include_input=True):
         self.in_dims = in_dims
         self.nb_freqs = nb_freqs
+        self.scale = scale
         self.include_input = include_input
         self.out_dims = (2 * in_dims * nb_freqs + in_dims) \
             if include_input else (2 * in_dims * nb_freqs)
@@ -18,11 +19,11 @@ class BaseEmbedder(object):
 
     def __call__(self, inputs):
         device = inputs.device
-        embeds = [inputs] if self.include_input else []
+        embeds = [inputs/self.scale] if self.include_input else []
         for freq in self.freqs:
             freq = freq.unsqueeze(0).to(device)
             for func in self.funcs:
-                embeds.append(func(inputs * freq))
+                embeds.append(func(inputs/self.scale * freq))
         embeds = torch.cat(embeds, dim=1)
         return embeds
 

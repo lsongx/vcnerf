@@ -1,6 +1,0 @@
-1. Parse video into frames.
-2. Resize frames so that focal_x = focal_y.
-3. Update collect_rays to cope with different intrinsic parameters.
-4. Test spherify_poses.
-5. Write a loader.
-6. Add deform_field.py.

@@ -734,7 +734,7 @@ def buildNerfPoses(poses, images_path = None):
 
 class OrbiterDataset:
     def __init__(self, dataset, ref_img, scale, dmin,
-            dmax, invz, transform=None,
+            dmax, invz, transform=None, cache_size=50,
             render_style='', offset=200, cv2resize=False):
         self.scale = scale
         self.dataset = dataset
@@ -763,7 +763,7 @@ class OrbiterDataset:
 
         self.cache = {}
         self.cache_queue = deque()
-        self.cache_size = 50
+        self.cache_size = cache_size
 
 
     def fromCache(self, img_path, scale):
