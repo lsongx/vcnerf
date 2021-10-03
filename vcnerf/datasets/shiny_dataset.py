@@ -8,15 +8,15 @@ from .utils.nex_llff_loader import OrbiterDataset
 from .builder import DATASETS
 
 
-def get_rays(h, w, px, py, fx, fy, r, t):
+def get_rays(h, w, px, py, fx, fy, c2w):
     i, j = torch.meshgrid(torch.linspace(0, w-1, w), torch.linspace(0, h-1, h))  # pytorch's meshgrid has indexing='ij'
     i = i.t()
     j = j.t()
     dirs = torch.stack([(i-px)/fx, -(j-py)/fy, -torch.ones_like(i)], -1)
     # Rotate ray directions from camera frame to the world frame
-    rays_d = torch.sum(dirs[..., None, :] * r, -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
+    rays_d = torch.sum(dirs[..., None, :] * c2w[:3,:3], -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
     # Translate camera frame's origin to the world frame. It is the origin of all rays.
-    rays_o = torch.tensor(t).view([-1]).expand(rays_d.shape)
+    rays_o = torch.tensor(c2w[:3,-1]).expand(rays_d.shape)
     return rays_o, rays_d
 
 
@@ -71,7 +71,8 @@ class ShinyDataset(object):
         rays_ori, rays_dir = get_rays(self.h, self.w, 
                                       item['px'], item['py'], 
                                       item['fx'], item['fy'],
-                                      item['r'], item['t'],)
+                                      item['ori_pose'],)
+                                    #   item['r'], item['t'],)
         rays_color = torch.tensor(item['image']).permute([1,2,0])
         
         if self.batch_size == -1:

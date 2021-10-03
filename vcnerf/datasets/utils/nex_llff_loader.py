@@ -723,7 +723,8 @@ def buildNerfPoses(poses, images_path = None):
             "r": r,
             "t": t,
             "R": R,
-            "center": center
+            "center": center,
+            "ori_pose": poses[poses_id]
         }
         if images_path is not None:
             output[poses_id]["path"] = images_path[poses_id]
@@ -822,6 +823,7 @@ class OrbiterDataset:
             'r': im['r'],
             't': im['t'],
             'center':im['center'],
+            'ori_pose':im['ori_pose'],
             'fx': cam['fx'],
             'fy': cam['fy'],
             'px': cam['px'],
