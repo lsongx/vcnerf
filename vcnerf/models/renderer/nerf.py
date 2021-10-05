@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from typing import final
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -141,18 +142,14 @@ class NeRF(nn.Module):
             z_vals[..., :, None]  # [B, n_samples, 3] or [B, H, W, n_samples, 3]
 
         # Evaluates the model at the points
-        # coarse_alphas, coarse_colors = run_model(model, points, directions, run_coarse=True, run_fine=False)[:2]
-        coarse_alphas, coarse_colors = self.forward_batchified(points, 
-                                                               directions, 
-                                                               run_coarse=True, 
-                                                               run_fine=False, 
-                                                               max_rays_num=max_rays_num)[:2]
-        coarse_outputs = raw2outputs(coarse_alphas, 
-                                     coarse_colors, 
-                                     z_vals, 
-                                     rays_dir,
-                                     alpha_noise_std,
-                                     white_bkgd)
+        raw2outputs_params = {'z_vals': z_vals, 'rays_dir': rays_dir, 
+                              'alpha_noise_std': alpha_noise_std, 
+                              'white_bkgd': white_bkgd,}
+        coarse_outputs = self.forward_batchified(points, 
+                                                 directions, 
+                                                 self.coarse_field,
+                                                 raw2outputs_params,
+                                                 max_rays_num=max_rays_num)
 
         if n_importance>0 and self.fine_field is not None:
             z_vals_mid = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
@@ -161,84 +158,67 @@ class NeRF(nn.Module):
             z_vals_fine, indices = torch.sort(torch.cat([z_vals, z_samples], dim=-1), dim=-1)
             z_vals_fine = z_vals_fine.detach()
 
-             # TODO: double check
-            if use_dirs:
-                directions = F.normalize(rays_dir, p=2, dim=-1)
-            else:
-                directions = None
-
             # points in space to evaluate model at
             points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
                 z_vals_fine[..., :, None]  # [B, n_importance, 3]
 
             # Evaluates the model at the points
-            # fine_alphas0, fine_colors0 = fine_alphas, fine_colors
+            raw2outputs_params['z_vals'] = z_vals_fine
             max_rays_num = int(max_rays_num * n_samples / (n_samples + n_importance))
-            fine_alphas, fine_colors = self.forward_batchified(points, 
-                                                               directions, 
-                                                               run_coarse=False, 
-                                                               run_fine=True,
-                                                               max_rays_num=max_rays_num)[2:]
-            fine_outputs = raw2outputs(fine_alphas, 
-                                       fine_colors, 
-                                       z_vals_fine, 
-                                       rays_dir,
-                                       alpha_noise_std,
-                                       white_bkgd)
+            fine_outputs = self.forward_batchified(points, 
+                                                   directions, 
+                                                   self.fine_field,
+                                                   raw2outputs_params,
+                                                   max_rays_num=max_rays_num)
         else:
             fine_outputs = None
         return {'fine': fine_outputs, 'coarse': coarse_outputs}
 
     @auto_fp16()
     def forward_batchified(self, 
-                           points, 
-                           directions, 
-                           run_coarse, 
-                           run_fine, 
-                           max_rays_num,):
+                           points, directions, field,
+                           raw2outputs_params, max_rays_num,):
         assert points.shape[0] == directions.shape[0], (
             f'points: {points.shape}, directions: {directions.shape}')
         nb_rays = points.shape[0]
-        if nb_rays <= max_rays_num and self.training:
-            return self.forward_points(points, directions, run_coarse, run_fine)
+        if nb_rays <= max_rays_num or self.training:
+            alphas, colors = self.forward_points(points, directions, field)
+            return raw2outputs(alphas, colors, **raw2outputs_params)
         else:
             outputs = []
             start = 0
             end = max_rays_num
             while start < nb_rays:
                 assert start < end, 'start >= end ({:d}, {:d})'.format(start, end)
-                output = self.forward_points(points[start: end, ...], 
-                                             directions[start: end, ...], 
-                                             run_coarse, 
-                                             run_fine,)
+                alphas, colors = self.forward_points(points[start: end, ...], 
+                                                     directions[start: end, ...], 
+                                                     field,)
+                local_raw2outputs_params = {
+                    'z_vals': raw2outputs_params['z_vals'][start:end, ...],
+                    'rays_dir': raw2outputs_params['rays_dir'][start:end, ...],
+                    'alpha_noise_std': raw2outputs_params['alpha_noise_std'], 
+                    'white_bkgd': raw2outputs_params['white_bkgd'],}
+                output = raw2outputs(alphas, colors, **local_raw2outputs_params)
                 outputs.append(output)
                 start += max_rays_num
                 end = min(end + max_rays_num, nb_rays)
             
-            alphas_colors = []
-            for i, out in enumerate(zip(*outputs)):
-                if out[0] is not None:
-                    out = torch.cat(out, dim=0)
+            final_output = {}
+            for k in output.keys():
+                if outputs[0][k] is None:
+                    final_output[k] = None
                 else:
-                    out = None
-                alphas_colors.append(out)
-            return alphas_colors
+                    final_output[k] = torch.cat([i[k] for i in outputs], 0)
+            return final_output
 
     @auto_fp16(apply_to=('points',))
-    def forward_points(self, 
-                       points, 
-                       directions=None, 
-                       run_coarse=True, 
-                       run_fine=True):
+    def forward_points(self, points, directions, field):
         shape = tuple(points.shape[:-1])  # [B, n_points]
         # [B, 3] -> [B, n_points, 3]
         directions = directions[..., None, :].expand_as(points)
         
         points = points.reshape((-1, 3))
         directions = directions.reshape((-1, 3))
-
-        if not run_coarse and not run_fine:
-            raise ValueError('One or both run_coarse and run_fine should be True')
 
         xyz_embeds = self.xyz_embedder(points)
         if self.dir_embedder is None:
@@ -247,25 +227,11 @@ class NeRF(nn.Module):
             assert self.dir_embedder is not None
             dir_embeds = self.dir_embedder(directions)
 
-        if run_coarse:
-            coarse_alphas, coarse_colors = self.coarse_field(xyz_embeds, dir_embeds)
-        else:
-            coarse_alphas, coarse_colors = None, None
-            
-        if run_fine and self.fine_field is not None:
-            fine_alphas, fine_colors = self.fine_field(xyz_embeds, dir_embeds)
-        else:
-            fine_alphas, fine_colors = None, None
+        alphas, colors = field(xyz_embeds, dir_embeds)
+        alphas = alphas.reshape(shape + (1,))
+        colors = colors.reshape(shape + (3,))
 
-        if coarse_alphas is not None:
-            # [B, n_points, 1/3]
-            coarse_alphas = coarse_alphas.reshape(shape + (1,))
-            coarse_colors = coarse_colors.reshape(shape + (3,))
-        if fine_alphas is not None:
-            fine_alphas = fine_alphas.reshape(shape + (1,))
-            fine_colors = fine_colors.reshape(shape + (3,))
-
-        return coarse_alphas, coarse_colors, fine_alphas, fine_colors
+        return alphas, colors
 
     def train_step(self, data, optimizer, **kwargs):
         for k, v in data.items():

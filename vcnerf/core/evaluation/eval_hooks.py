@@ -99,6 +99,7 @@ class DistEvalHook(Hook):
         self.out_dir = out_dir
         self.logger = logger
         self.best_psnr = 0
+        self.bestname = f'checkpoint_{self.best_psnr:.2f}.pth'
         self.im_shape = (
             int(dataloader.dataset.h), int(dataloader.dataset.w), 3)
 
@@ -107,6 +108,7 @@ class DistEvalHook(Hook):
             return
         if not self.out_dir:
             self.out_dir = runner.work_dir
+    # def before_train_iter(self, runner):
         psnr = self.evaluate(runner)
         if runner.rank == 0:
             is_best = False

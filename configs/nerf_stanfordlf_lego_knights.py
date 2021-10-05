@@ -41,34 +41,29 @@ model = dict(
 # dataset settings
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=0,
+    workers_per_gpu=2,
     train=dict(        
         type='RepeatDataset',
         dataset=dict(
-            type='StanfordLFDataset',
-            base_dir='~/data/3d/StanfordLF/lego-knights/rectified', 
-            pixel_move=[-240,150],
-            grid=1,
-            downsample=2,
-            # downsample=4,
-            scale=1024,
-            batch_size=int(1024*3),
-            keep_idx=['_00_00_', '_00_16_', '_08_08_', '_16_00_', '_16_16_'],
-            # keep_idx=['_00_00_', '_00_16_', '_16_00_', '_16_16_'],
-            perturb=True,
-            split='train',),
+            type='LLFFDataset',
+            datadir='~/data/3d/StanfordLF-colmap/lego-knights', 
+            factor=2, 
+            batch_size=1024*2,
+            # split='train', 
+            split='all', 
+            spherify=False, 
+            no_ndc=True, 
+            holdout=-1),
         times=100),
     val=dict(
-        type='StanfordLFDataset',
-        base_dir='~/data/3d/StanfordLF/lego-knights/rectified', 
-        pixel_move=[-240,150],
-        grid=1,
-        downsample=2,
-        # downsample=4,
-        scale=1024,
+        type='LLFFDataset',
+        datadir='~/data/3d/StanfordLF-colmap/lego-knights', 
+        factor=2, 
         batch_size=-1,
-        keep_idx=['_04_08_', '_10_08_'],
-        split='val',),)
+        split='val', 
+        spherify=False, 
+        no_ndc=True, 
+        holdout=-1),)
 
 # optimizer
 optimizer = dict(type='Adam', lr=5e-4, betas=(0.9, 0.999))
@@ -80,13 +75,13 @@ runner = dict(type='EpochBasedRunner', max_epochs=200)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 log_config = dict(
-    interval=200,
+    interval=20,
     hooks=[
         dict(type='TextLoggerHook'),
         # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
-    interval=2500, # every 2500 iterations
+    interval=int(1e8), # every 2500 iterations
     render_params=dict(
         n_samples=64,
         n_importance=128,

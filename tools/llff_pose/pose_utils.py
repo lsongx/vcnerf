@@ -31,6 +31,7 @@ def load_colmap_data(realdir):
     names = [imdata[k].name for k in imdata]
     print( 'Images #', len(names))
     perm = np.argsort(names)
+    sorted_names = np.array(names)[perm]
     for k in imdata:
         im = imdata[k]
         R = im.qvec2rotmat()
@@ -50,10 +51,10 @@ def load_colmap_data(realdir):
     # must switch to [-u, r, -t] from [r, -u, t], NOT [r, u, -t]
     poses = np.concatenate([poses[:, 1:2, :], poses[:, 0:1, :], -poses[:, 2:3, :], poses[:, 3:4, :], poses[:, 4:5, :]], 1)
     
-    return poses, pts3d, perm
+    return poses, pts3d, perm, sorted_names
 
 
-def save_poses(basedir, poses, pts3d, perm):
+def save_poses(basedir, poses, pts3d, perm, sorted_names):
     pts_arr = []
     vis_arr = []
     for k in pts3d:
@@ -86,8 +87,8 @@ def save_poses(basedir, poses, pts3d, perm):
     save_arr = np.array(save_arr)
     
     np.save(os.path.join(basedir, 'poses_bounds.npy'), save_arr)
-            
-
+    with open(os.path.join(basedir, 'sorted_names.txt'), 'w') as f:
+        f.write('\n'.join(sorted_names))
 
 
 def minify_v0(basedir, factors=[], resolutions=[]):
@@ -271,9 +272,9 @@ def gen_poses(basedir, match_type, factors=None):
         
     print( 'Post-colmap')
     
-    poses, pts3d, perm = load_colmap_data(basedir)
+    poses, pts3d, perm, sorted_names = load_colmap_data(basedir)
     
-    save_poses(basedir, poses, pts3d, perm)
+    save_poses(basedir, poses, pts3d, perm, sorted_names)
     
     if factors is not None:
         print( 'Factors:', factors)

@@ -246,6 +246,8 @@ def spherify_poses(poses, bds):
 
 def load_llff_data(basedir, 
                    factor=8, 
+                   width=None,
+                   height=None,
                    recenter=True, 
                    bd_factor=.75, 
                    spherify=False, 
@@ -256,7 +258,7 @@ def load_llff_data(basedir,
                    zrate=0.5,):
     logger = get_root_logger()
 
-    poses, bds, imgs, imgfiles = _load_data(basedir, factor=factor) # factor=8 downsamples original imgs by 8x
+    poses, bds, imgs, imgfiles = _load_data(basedir, factor, width, height) # factor=8 downsamples original imgs by 8x
     logger.info(f'Loaded {basedir} {bds.min()} {bds.max()}')
     
     # Correct rotation matrix ordering and move variable dim to axis 0

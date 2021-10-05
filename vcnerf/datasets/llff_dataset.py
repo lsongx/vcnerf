@@ -1,5 +1,6 @@
-import os.path as osp
+import os
 import numpy as np
+from PIL import Image
 import torch
 
 from vcnerf.utils import get_root_logger
@@ -53,11 +54,12 @@ class LLFFDataset:
                  spherify, 
                  no_ndc, 
                  holdout,
+                 to_cuda=False,
                  llff_data_param={}):
         self.logger = get_root_logger()
         self.batch_size = batch_size
         self.no_ndc = no_ndc
-        datadir = osp.expanduser(datadir)
+        datadir = os.path.expanduser(datadir)
         images, poses, bds, render_poses, i_test = load_llff_data(
             datadir, factor, recenter=True, bd_factor=.75, spherify=spherify, **llff_data_param)
         self.hwf = poses[0, :3, -1]
@@ -80,8 +82,12 @@ class LLFFDataset:
             all_idx = np.array([
                 i for i in np.arange(int(images.shape[0])) 
                 if (i not in i_test and i not in i_val)])
-        else:
+        elif split == 'val':
             all_idx = i_val
+        elif split == 'all':
+            all_idx = np.arange(images.shape[0])
+        else:
+            raise NotImplementedError
 
         self.logger.info('DEFINING BOUNDS')
         if no_ndc:
@@ -96,6 +102,10 @@ class LLFFDataset:
         self.imgs = torch.tensor(images[all_idx])
         self.poses = torch.tensor(self.poses[all_idx])
         self.render_poses = torch.tensor(render_poses)
+        if to_cuda:
+            self.imgs.cuda()
+            self.poses.cuda()
+            self.render_poses.cuda()
 
     def __len__(self):
         return len(self.poses)

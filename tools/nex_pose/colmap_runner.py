@@ -18,7 +18,7 @@ from scipy import misc
 import sys
 import json
 import argparse
-from .colmap_read_model import *
+from colmap_read_model import *
 import shutil
 
 def cmd(s):
@@ -95,7 +95,7 @@ def load_colmap_data(realdir):
   names = [imdata[k].name for k in imdata]
   print( 'Images #', len(names))
   perm = np.argsort(names)
-  sorted_name = names[perm]
+  sorted_name = np.array(names)[perm]
   for k in imdata:
     im = imdata[k]
     R = im.qvec2rotmat()

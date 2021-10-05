@@ -286,6 +286,7 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
     sc = 1. if bd_factor is None else 1./(bds.min() * bd_factor)
     poses[:,:3,3] *= sc
     bds *= sc
+    import pdb;pdb.set_trace()
 
     if recenter:
         poses = recenter_poses(poses)

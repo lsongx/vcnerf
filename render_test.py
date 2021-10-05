@@ -3,15 +3,22 @@ import torch
 import matplotlib.pyplot as plt
 from mmcv import Config
 import imageio
+import argparse
 
 from vcnerf.models import build_renderer
 from vcnerf.datasets import build_dataset
 
-for f in os.listdir('./data/out'):
-    if 'py' in f:
+parser = argparse.ArgumentParser()
+parser.add_argument("-f", default="./data/out/")
+args = parser.parse_args()
+
+base = os.path.join(args.f)
+for f in os.listdir(base):
+    if '.py' in f:
+        print(f'{f} loaded.')
         break
-cfg_file = f'./data/out/{f}'
-state_dict = './data/out/latest.pth'
+cfg_file = f'{base}/{f}'
+state_dict = f'{base}/latest.pth'
 
 cfg = Config.fromfile(cfg_file)
 cfg.data.val.llff_data_param = {'percentile': 38, 'N_views': 27*3, 'zrate': 0.8}

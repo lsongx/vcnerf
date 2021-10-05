@@ -1,4 +1,4 @@
-from .colmap_runner import colmapGenPoses
+from colmap_runner import colmapGenPoses
 import sys
 
 import argparse
