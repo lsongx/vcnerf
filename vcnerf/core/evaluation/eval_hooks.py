@@ -130,6 +130,7 @@ class DistEvalHook(Hook):
         loss = torch.zeros(1, dtype=torch.float, device=f'cuda:{runner.rank}')
         psnr = torch.zeros(1, dtype=torch.float, device=f'cuda:{runner.rank}')
         size = torch.zeros(1, dtype=torch.float, device=f'cuda:{runner.rank}')
+        step = runner.iter+1 if runner.iter is not None else 0
 
         for i, rays in enumerate(self.dataloader):
             with torch.no_grad():
@@ -143,14 +144,14 @@ class DistEvalHook(Hook):
             # TODO: convert to video
             cv2.imwrite(osp.join(
                 self.out_dir, 
-                f'iter{runner.iter+1}-id{runner.rank+i}-coarse.png'), im[:,:,::-1])
+                f'iter{step}-id{runner.rank+i}-coarse.png'), im[:,:,::-1])
             if outputs['fine'] is not None:
                 im = outputs['fine']['color_map'].reshape(self.im_shape)
                 im = 255 * im.detach().cpu().numpy()
                 # TODO: convert to video
                 cv2.imwrite(osp.join(
                     self.out_dir, 
-                    f'iter{runner.iter+1}-id{runner.rank+i}-fine.png'), im[:,:,::-1])
+                    f'iter{step}-id{runner.rank+i}-fine.png'), im[:,:,::-1])
 
             loss += outputs['log_vars']['loss']
             psnr += outputs['log_vars']['psnr']

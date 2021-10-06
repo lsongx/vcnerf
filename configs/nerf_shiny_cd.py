@@ -34,8 +34,8 @@ model = dict(
         n_importance=128,
         perturb=True,
         alpha_noise_std=1.0,
-        # inv_depth=False,
-        inv_depth=True,
+        inv_depth=False,
+        # inv_depth=True,
         use_dirs=True,
         max_rays_num=1024*3,))
 
@@ -88,8 +88,8 @@ evaluation = dict(
         n_importance=128,
         perturb=False,
         alpha_noise_std=0,
-        # inv_depth=False,
-        inv_depth=True,
+        inv_depth=False,
+        # inv_depth=True,
         use_dirs=True,
         max_rays_num=1024*2,))
 dist_params = dict(backend='nccl')
