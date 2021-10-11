@@ -8,34 +8,34 @@ model = dict(
         type='BaseEmbedder',
         in_dims=3, 
         nb_freqs=10, 
-        # scale=100,
-        include_input=True),
+        scale=10,
+        include_input=False),
     dir_embedder=dict(
         type='BaseEmbedder',
         in_dims=3, 
         nb_freqs=4, 
-        include_input=True),
+        include_input=False),
     coarse_field=dict(
         type='BaseField',
         nb_layers=8, 
         hid_dims=256, 
-        xyz_emb_dims=2*3*10+3,
-        dir_emb_dims=2*3*4+3,
+        xyz_emb_dims=2*3*10, #2*3*10+3,
+        dir_emb_dims=2*3*4, #2*3*4+3,
         use_dirs=True),
     fine_field=dict(
         type='BaseField',
         nb_layers=8, 
         hid_dims=256, 
-        xyz_emb_dims=2*3*10+3,
-        dir_emb_dims=2*3*4+3,
+        xyz_emb_dims=2*3*10, #2*3*10+3,
+        dir_emb_dims=2*3*4, #2*3*4+3,
         use_dirs=True),
     render_params=dict( # default render cfg; train cfg
         n_samples=64,
         n_importance=128,
         perturb=True,
         alpha_noise_std=1.0,
-        # inv_depth=False,
-        inv_depth=True,
+        inv_depth=False,
+        # inv_depth=True,
         use_dirs=True,
         max_rays_num=1024*3,))
 
@@ -43,7 +43,7 @@ model = dict(
 data = dict(
     samples_per_gpu=1,
     workers_per_gpu=5,
-    train=dict(        
+    train=dict(
         type='RepeatDataset',
         dataset=dict(
             type='ShinyDataset',
@@ -71,7 +71,7 @@ optimizer_config = dict(grad_clip=None)
 # lr_config = dict(policy='Exp', gamma=0.1**((1/1000)*(1/250)), by_epoch=False) 
 # lr_config = dict(policy='Step', step=[40,80,120,160,180], gamma=0.5, by_epoch=True)
 # runner = dict(type='EpochBasedRunner', max_epochs=200)
-lr_config = dict(policy='Step', step=[20,40,60,80,90], gamma=0.5, by_epoch=True)
+lr_config = dict(policy='Step', step=[20,40,60,80], gamma=0.5, by_epoch=True)
 runner = dict(type='EpochBasedRunner', max_epochs=100)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=5)
@@ -88,8 +88,8 @@ evaluation = dict(
         n_importance=128,
         perturb=False,
         alpha_noise_std=0,
-        # inv_depth=False,
-        inv_depth=True,
+        inv_depth=False,
+        # inv_depth=True,
         use_dirs=True,
         max_rays_num=1024*2,))
 dist_params = dict(backend='nccl')

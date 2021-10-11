@@ -42,7 +42,7 @@ class BaseField(nn.Module):
     
     @auto_fp16()
     def forward(self, xyz_embeds, dir_embeds=None):
-        x = xyz_embeds.clone()
+        x = xyz_embeds
         for i in range(self.nb_layers):
             key = 'fc{}'.format(i)
             layer = self.layers[key]

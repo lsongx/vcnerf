@@ -75,7 +75,7 @@ runner = dict(type='EpochBasedRunner', max_epochs=200)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 log_config = dict(
-    interval=20,
+    interval=50,
     hooks=[
         dict(type='TextLoggerHook'),
         # dict(type='TensorboardLoggerHook', log_dir='./logs')

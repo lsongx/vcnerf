@@ -21,7 +21,8 @@ cfg_file = f'{base}/{f}'
 state_dict = f'{base}/latest.pth'
 
 cfg = Config.fromfile(cfg_file)
-cfg.data.val.llff_data_param = {'percentile': 38, 'N_views': 27*3, 'zrate': 0.8}
+# cfg.data.val.llff_data_param = {'percentile': 38, 'N_views': 27*3, 'zrate': 0.8}
+cfg.data.val.llff_data_param = {'percentile': 38, 'N_views': 27, 'N_rots':1, 'zrate': 0.8}
 dataset = build_dataset(cfg.data.val)
 dataset.poses = dataset.render_poses
 model = build_renderer(cfg.model).cuda()
@@ -32,6 +33,7 @@ w = dataset.w
 
 all_coarse_im = []
 all_fine_im = []
+model.eval()
 num_images = len(dataset)
 for i in range(num_images):
     data = {}
@@ -45,15 +47,15 @@ for i in range(num_images):
         result = model.forward_render(**data, **cfg.evaluation.render_params)
     coarse_im = result['coarse']['color_map'].clamp(0,1).cpu().numpy().reshape([h,w,3])
     fine_im = result['fine']['color_map'].clamp(0,1).cpu().numpy().reshape([h,w,3])
-    plt.imsave(f'./data/out/pred-coarse-{i:03d}.png', coarse_im)
-    plt.imsave(f'./data/out/pred-fine-{i:03d}.png', fine_im)
+    plt.imsave(f'{base}/pred-coarse-{i:03d}.png', coarse_im)
+    plt.imsave(f'{base}/pred-fine-{i:03d}.png', fine_im)
     all_coarse_im.append(coarse_im)
     all_fine_im.append(fine_im)
     print(f'[{i:03d}]/[{num_images:03d}] image finished')
 
-imageio.mimsave('./data/out/pred-coarse.gif', all_coarse_im)
-imageio.mimsave('./data/out/pred-fine.gif', all_fine_im)
-os.system(f'ffmpeg -y -framerate 8 -i ./data/out/pred-fine-%03d.png -b 20M ./data/out/pred-fine.avi')
+imageio.mimsave(f'{base}/pred-coarse.gif', all_coarse_im)
+imageio.mimsave(f'{base}/pred-fine.gif', all_fine_im)
+os.system(f'ffmpeg -y -framerate 8 -i {base}/pred-fine-%03d.png -b 20M {base}/pred-fine.avi')
 
 import ipdb; ipdb.set_trace()
 

@@ -45,8 +45,10 @@ class EvalHook(Hook):
             self.bestname = f'checkpoint_{self.best_psnr:.2f}.pth'
             if self.logger is not None:
                 self.logger.info(f'Saving best {self.bestname}.')
-        torch.save(runner.model.state_dict(), 
-                    osp.join(self.out_dir, self.bestname))
+            torch.save(runner.model.state_dict(), 
+                        osp.join(self.out_dir, self.bestname))
+        else:
+            self.logger.info(f'Current best {self.bestname}.')
 
     def evaluate(self, runner):
         runner.model.eval()
@@ -121,8 +123,10 @@ class DistEvalHook(Hook):
                 self.bestname = f'checkpoint_{self.best_psnr:.2f}.pth'
                 if self.logger is not None:
                     self.logger.info(f'Saving best {self.bestname}.')
-            torch.save(runner.model.state_dict(), 
-                       osp.join(self.out_dir, self.bestname))
+                torch.save(runner.model.state_dict(), 
+                        osp.join(self.out_dir, self.bestname))
+            else:
+                self.logger.info(f'Current best {self.bestname}.')
         dist.barrier()
 
     def evaluate(self, runner):
