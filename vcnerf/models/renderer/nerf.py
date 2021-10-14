@@ -113,7 +113,7 @@ class NeRF(nn.Module):
         dtype = rays_dir.dtype
         device = rays_ori.device
         base_shape = list(rays_ori.shape[:-1])
-        if isinstance(near, torch.Tensor):
+        if isinstance(near, torch.Tensor) and len(near.shape)>0:
             near = near[...,0].item()
             far = far[...,0].item()
 
