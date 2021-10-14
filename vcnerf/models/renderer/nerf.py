@@ -1,5 +1,7 @@
 from collections import OrderedDict
 from typing import final
+from vcnerf.datasets.llff_dataset import LLFFDataset
+from numpy.lib.arraysetops import isin
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -111,15 +113,21 @@ class NeRF(nn.Module):
         dtype = rays_dir.dtype
         device = rays_ori.device
         base_shape = list(rays_ori.shape[:-1])
+        if isinstance(near, torch.Tensor):
+            near = near[...,0].item()
+            far = far[...,0].item()
 
         if not inv_depth:
             z_vals = torch.linspace(
                 near, far, n_samples, 
                 dtype=dtype, device=device).expand([*base_shape, n_samples])
         else:
-            z_vals = 1/torch.linspace(
-                1, near/far, n_samples, 
-                dtype=dtype, device=device).expand([*base_shape, n_samples])*near
+            z_vals = torch.linspace(0, 1, n_samples, dtype=dtype, device=device)
+            z_vals = z_vals.pow(0.5).expand([*base_shape, n_samples])
+            z_vals = near*z_vals+far*(1-z_vals)
+            # z_vals = 1/torch.linspace(
+            #     1, near/far, n_samples, 
+            #     dtype=dtype, device=device).expand([*base_shape, n_samples])*near
 
         # Perturbs points coordinates
         if perturb:
@@ -242,5 +250,20 @@ class NeRF(nn.Module):
         return outputs
 
     def val_step(self, data, optimizer, **kwargs):
-        return self.train_step(data, optimizer, **kwargs)
+        collect_keys = kwargs.pop('collect_keys', None)
+        outputs = self.train_step(data, optimizer, **kwargs)
+        if collect_keys is None:
+            return outputs
+        new_out = {}
+        for k in outputs.keys():
+            if not isinstance(outputs[k], dict):
+                new_out[k] = outputs[k]
+                continue
+            new_out[k] = {}
+            for sub_k in outputs[k].keys():
+                if sub_k in collect_keys:
+                    new_out[k][sub_k] = outputs[k][sub_k]
+        del outputs
+        return new_out
+
 

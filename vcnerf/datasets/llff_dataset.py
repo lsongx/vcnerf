@@ -1,3 +1,4 @@
+import math
 import os
 import numpy as np
 from PIL import Image
@@ -54,6 +55,7 @@ class LLFFDataset:
                  spherify, 
                  no_ndc, 
                  holdout,
+                 batching=True,
                  to_cuda=False,
                  llff_data_param={}):
         self.logger = get_root_logger()
@@ -106,14 +108,37 @@ class LLFFDataset:
             self.imgs.cuda()
             self.poses.cuda()
             self.render_poses.cuda()
+        self.batching = batching
+        self.length = len(self.poses)
+        if self.batching:
+            all_rays_ori, all_rays_dir = [], []
+            self.logger.info(f'creating all rays')
+            for p in self.poses[:, :3, :4]:
+                ro, rd = get_rays(self.h, self.w, self.focal, p) 
+                all_rays_ori.append(ro)
+                all_rays_dir.append(rd)
+            self.logger.info(f'finish creating all rays')
+            self.all_rays_ori = torch.stack(all_rays_ori, dim=0).view([-1,3])
+            self.all_rays_dir = torch.stack(all_rays_dir, dim=0).view([-1,3])
+            self.imgs = self.imgs.view(-1,3)
+            self.length = self.imgs.shape[0]
 
     def __len__(self):
-        return len(self.poses)
+        return self.length
 
     def __getitem__(self, idx):
-        target = self.imgs[idx%len(self.imgs)]
-        pose = self.poses[idx, :3,:4]
-        rays_ori, rays_dir = get_rays(self.h, self.w, self.focal, pose)
+        if self.batching:
+            return {'rays_ori': self.all_rays_ori[idx,:], 
+                    'rays_dir': self.all_rays_dir[idx,:], 
+                    'rays_color': self.imgs[idx,:], 
+                    'near': self.near, 'far': self.far}
+        else:
+            target = self.imgs[idx%len(self.imgs)]
+            pose = self.poses[idx, :3,:4]
+            rays_ori, rays_dir = get_rays(self.h, self.w, self.focal, pose)
+
+        if not self.no_ndc:
+            rays_ori, rays_dir = ndc_rays(self.h, self.w, self.focal, 1., rays_ori, rays_dir)
 
         if self.batch_size == -1:
             rays_color = target.view([-1,3])  # (N, 3)
@@ -125,17 +150,12 @@ class LLFFDataset:
         coords = torch.stack(torch.meshgrid(
             torch.linspace(0, self.h-1, self.h), 
             torch.linspace(0, self.w-1, self.w)), -1)
-
         coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
         select_inds = np.random.choice(coords.shape[0], size=[self.batch_size], replace=False)  # (N,)
         select_coords = coords[select_inds].long()  # (N, 2)
         rays_ori = rays_ori[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
         rays_dir = rays_dir[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
         rays_color = target[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
-
-        if not self.no_ndc:
-            rays_ori, rays_dir = ndc_rays(
-                self.h, self.w, self.focal, 1, rays_ori, rays_dir)
 
         return {'rays_ori': rays_ori, 'rays_dir': rays_dir, 
                 'rays_color': rays_color, 'near': self.near, 'far': self.far}

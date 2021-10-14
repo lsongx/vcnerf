@@ -6,6 +6,7 @@ import numpy as np
 import imageio
 import cv2
 import torch
+from torch._C import device
 
 from vcnerf.utils import get_root_logger
 from .builder import DATASETS
@@ -39,10 +40,13 @@ def pose_spherical(theta, phi, radius):
 
 
 def get_rays(H, W, focal, c2w):
+    device = c2w.device
     i, j = torch.meshgrid(torch.linspace(0, W-1, W), torch.linspace(0, H-1, H))  # pytorch's meshgrid has indexing='ij'
-    i = i.t()
-    j = j.t()
-    dirs = torch.stack([(i-W*.5)/focal, -(j-H*.5)/focal, -torch.ones_like(i)], -1)
+    i = i.t().to(device)
+    j = j.t().to(device)
+    dirs = torch.stack([(i-W*.5)/focal, 
+                        -(j-H*.5)/focal, 
+                        -torch.ones_like(i, device=device)], -1)
     # Rotate ray directions from camera frame to the world frame
     rays_d = torch.sum(dirs[..., None, :] * c2w[:3,:3], -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
     # Translate camera frame's origin to the world frame. It is the origin of all rays.

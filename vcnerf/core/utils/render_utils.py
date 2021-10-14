@@ -82,8 +82,9 @@ class SamplePDF(torch.nn.Module):
     """
     def __init__(self):
         super().__init__()
+        self.fp16_enabled = False
     
-    @force_fp32()
+    @auto_fp16()
     def forward(self, bins, weights, n_importance, deterministic=False):
         # Get pdf
         weights = weights + 1e-5  # prevent nan

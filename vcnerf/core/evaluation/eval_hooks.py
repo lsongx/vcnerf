@@ -29,8 +29,8 @@ class EvalHook(Hook):
         self.im_shape = (
             dataloader.dataset.h, dataloader.dataset.w, 3)
 
-    def after_train_iter(self, runner):
-        if not self.every_n_iters(runner, self.interval):
+    def after_train_epoch(self, runner):
+        if not self.every_n_epochs(runner, self.interval):
             return
         if not self.out_dir:
             self.out_dir = runner.work_dir
@@ -105,12 +105,11 @@ class DistEvalHook(Hook):
         self.im_shape = (
             int(dataloader.dataset.h), int(dataloader.dataset.w), 3)
 
-    def after_train_iter(self, runner):
-        if not self.every_n_iters(runner, self.interval):
+    def after_train_epoch(self, runner):
+        if not self.every_n_epochs(runner, self.interval):
             return
         if not self.out_dir:
             self.out_dir = runner.work_dir
-    # def before_train_iter(self, runner):
         psnr = self.evaluate(runner)
         if runner.rank == 0:
             is_best = False
@@ -140,7 +139,8 @@ class DistEvalHook(Hook):
             with torch.no_grad():
                 outputs = runner.model.val_step(rays, 
                                                 runner.optimizer,
-                                                render_params=self.render_params)
+                                                render_params=self.render_params,
+                                                collect_keys=['color_map', 'loss', 'psnr'])
 
             # save images
             im = outputs['coarse']['color_map'].reshape(self.im_shape)
