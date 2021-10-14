@@ -3,6 +3,7 @@ import os
 import numpy as np
 from PIL import Image
 import torch
+from torch._C import device
 
 from vcnerf.utils import get_root_logger
 from .synthetic_dataset import get_rays
@@ -120,6 +121,9 @@ class LLFFDataset:
             self.logger.info(f'finish creating all rays')
             self.all_rays_ori = torch.stack(all_rays_ori, dim=0).view([-1,3])
             self.all_rays_dir = torch.stack(all_rays_dir, dim=0).view([-1,3])
+            if not self.no_ndc:
+                self.all_rays_ori, self.all_rays_dir = ndc_rays(
+                    self.h, self.w, self.focal, 1., self.all_rays_ori, self.all_rays_dir)
             self.imgs = self.imgs.view(-1,3)
             self.length = self.imgs.shape[0]
 
@@ -141,21 +145,17 @@ class LLFFDataset:
             rays_ori, rays_dir = ndc_rays(self.h, self.w, self.focal, 1., rays_ori, rays_dir)
 
         if self.batch_size == -1:
-            rays_color = target.view([-1,3])  # (N, 3)
             return {'rays_ori': rays_ori.view([-1,3]), 
                     'rays_dir': rays_dir.view([-1,3]), 
-                    'rays_color': rays_color, 
+                    'rays_color': target.view([-1,3]), 
                     'near': self.near, 'far': self.far}
 
-        coords = torch.stack(torch.meshgrid(
-            torch.linspace(0, self.h-1, self.h), 
-            torch.linspace(0, self.w-1, self.w)), -1)
-        coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
-        select_inds = np.random.choice(coords.shape[0], size=[self.batch_size], replace=False)  # (N,)
-        select_coords = coords[select_inds].long()  # (N, 2)
-        rays_ori = rays_ori[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
-        rays_dir = rays_dir[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
-        rays_color = target[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
+        select_mask = torch.zeros([self.h*self.w], device=rays_ori.device, dtype=torch.bool)
+        select_mask[torch.randperm(self.h*self.w)[:self.batch_size]] = 1
+        select_mask = select_mask.view([self.h,self.w])
+        rays_ori = rays_ori[select_mask]  # (N, 3)
+        rays_dir = rays_dir[select_mask]  # (N, 3)
+        rays_color = target[select_mask]  # (N, 3)
 
         return {'rays_ori': rays_ori, 'rays_dir': rays_dir, 
                 'rays_color': rays_color, 'near': self.near, 'far': self.far}
