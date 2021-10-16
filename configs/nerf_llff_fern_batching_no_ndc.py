@@ -8,89 +8,101 @@ model = dict(
         type='BaseEmbedder',
         in_dims=3, 
         n_freqs=10, 
-        include_input=True),
+        # include_input=True),
+        include_input=False),
     dir_embedder=dict(
         type='BaseEmbedder',
         in_dims=3, 
         n_freqs=4, 
-        include_input=True),
-    # out_dim = (2*in_dims*n_freqs + in_dims) if include_input else (2*in_dims*n_freqs)
+        # include_input=True),
+        include_input=False),
     coarse_field=dict(
         type='BaseField',
         nb_layers=8, 
         hid_dims=256, 
-        xyz_emb_dims=63, # 2*3*10+3
-        dir_emb_dims=27, # 2*3*4+3
+        xyz_emb_dims=2*3*10,#+3,
+        dir_emb_dims=2*3*4,#+3,
         use_dirs=True),
     fine_field=dict(
         type='BaseField',
         nb_layers=8, 
         hid_dims=256, 
-        xyz_emb_dims=63, # 2*3*10+3
-        dir_emb_dims=27, # 2*3*4+3
+        xyz_emb_dims=2*3*10,#+3,
+        dir_emb_dims=2*3*4,#+3,
         use_dirs=True),
     render_params=dict( # default render cfg; train cfg
         n_samples=64,
         n_importance=128,
         perturb=True,
         alpha_noise_std=1.0,
-        # inv_depth=False,
-        inv_depth=True,
+        inv_depth=False,
+        # inv_depth=True,
         use_dirs=True,
         max_rays_num=1024*3,))
 
 # dataset settings
 data = dict(
-    samples_per_gpu=1,
-    workers_per_gpu=0,
+    samples_per_gpu=1024*4,
+    workers_per_gpu=16,
     train=dict(        
         type='RepeatDataset',
         dataset=dict(
             type='LLFFDataset',
-            datadir='~/data/3d/llff-undistort/fern', 
-            factor=8, 
-            batch_size=1024*3,
-            split='train', 
+            datadir='~/data/3d/nerf/nerf_llff_data/fern', 
+            factor=4, 
+            batch_size=None,
+            split='train',
+            batching=True, 
             spherify=False, 
             no_ndc=True, 
+            to_cuda=True,
             holdout=8),
-        times=100),
+        times=1),
     val=dict(
         type='LLFFDataset',
-        datadir='~/data/3d/llff-undistort/fern', 
-        factor=8, 
+        datadir='~/data/3d/nerf/nerf_llff_data/fern', 
+        factor=4, 
         batch_size=-1,
         split='val', 
+        batching=False,
         spherify=False, 
         no_ndc=True, 
+        to_cuda=True,
         holdout=8),)
 
 # optimizer
 optimizer = dict(type='Adam', lr=5e-4, betas=(0.9, 0.999))
+# optimizer = dict(type='Adam', lr=1e-3, betas=(0.9, 0.999))
+# optimizer = dict(type='AdamW', lr=1e-3)
 optimizer_config = dict(grad_clip=None)
 # learning policy
 # lr_config = dict(policy='Exp', gamma=0.1**((1/1000)*(1/250)), by_epoch=False) 
 # lr_config = dict(policy='Step', step=[40,80,120,160,180], gamma=0.5, by_epoch=True)
 # runner = dict(type='EpochBasedRunner', max_epochs=200)
-lr_config = dict(policy='Step', step=[20,40,60,80,90], gamma=0.5, by_epoch=True)
+# lr_config = dict(policy='Step', step=[20,40,60,80,90], gamma=0.5, by_epoch=True)
+# lr_config = dict(policy='Step', step=[50,80,90], gamma=0.5, by_epoch=True)
+# runner = dict(type='EpochBasedRunner', max_epochs=100)
+lr_config = dict(policy='Poly', min_lr=5e-6, by_epoch=True)
 runner = dict(type='EpochBasedRunner', max_epochs=100)
+# lr_config = dict(policy='Step', step=[100,200,300], gamma=0.5, by_epoch=True)
+# runner = dict(type='EpochBasedRunner', max_epochs=300)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 log_config = dict(
-    interval=200,
+    interval=1000,
     hooks=[
         dict(type='TextLoggerHook'),
         # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
-    interval=2500, # every 2500 iterations
+    interval=1,
     render_params=dict(
         n_samples=64,
         n_importance=128,
         perturb=False,
         alpha_noise_std=0,
-        # inv_depth=False,
-        inv_depth=True,
+        inv_depth=False,
+        # inv_depth=True,
         use_dirs=True,
         max_rays_num=1024*2,))
 dist_params = dict(backend='nccl')

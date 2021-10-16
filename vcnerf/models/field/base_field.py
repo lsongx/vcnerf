@@ -66,12 +66,3 @@ class BaseField(nn.Module):
             colors = self.color_out(x)
         colors = torch.sigmoid(colors)
         return alphas, colors
-
-
-if __name__ == '__main__':
-    xyz_embeds = torch.rand((2, 63))
-    dir_embeds = torch.rand((2, 27))
-    field = BaseField()
-    alphas, colors = field(xyz_embeds, dir_embeds)
-    print('alphas:', alphas.shape)
-    print('colors:', colors.shape)

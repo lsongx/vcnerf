@@ -7,13 +7,14 @@ model = dict(
     xyz_embedder=dict(
         type='BaseEmbedder',
         in_dims=3, 
-        nb_freqs=10, 
+        n_freqs=10, 
         # include_input=True),
         include_input=False),
     dir_embedder=dict(
         type='BaseEmbedder',
         in_dims=3, 
-        nb_freqs=4, 
+        n_freqs=4, 
+        scale=128,
         # include_input=True),
         include_input=False),
     coarse_field=dict(
@@ -42,7 +43,7 @@ model = dict(
 
 # dataset settings
 data = dict(
-    samples_per_gpu=1024*2,
+    samples_per_gpu=1024*4,
     workers_per_gpu=16,
     train=dict(        
         type='RepeatDataset',
@@ -80,7 +81,9 @@ optimizer_config = dict(grad_clip=None)
 # lr_config = dict(policy='Step', step=[40,80,120,160,180], gamma=0.5, by_epoch=True)
 # runner = dict(type='EpochBasedRunner', max_epochs=200)
 # lr_config = dict(policy='Step', step=[20,40,60,80,90], gamma=0.5, by_epoch=True)
-lr_config = dict(policy='Step', step=[50,80,90], gamma=0.5, by_epoch=True)
+# lr_config = dict(policy='Step', step=[50,80,90], gamma=0.5, by_epoch=True)
+# runner = dict(type='EpochBasedRunner', max_epochs=100)
+lr_config = dict(policy='Poly', power=2, min_lr=5e-6, by_epoch=True)
 runner = dict(type='EpochBasedRunner', max_epochs=100)
 # lr_config = dict(policy='Step', step=[100,200,300], gamma=0.5, by_epoch=True)
 # runner = dict(type='EpochBasedRunner', max_epochs=300)

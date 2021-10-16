@@ -80,18 +80,6 @@ class LLFFDataset:
             self.logger.info(f'Hold out overwrite. Auto LLFF holdout: {holdout}')
             i_test = np.arange(images.shape[0])[::holdout]
 
-        i_val = i_test
-        if split == "train":
-            all_idx = np.array([
-                i for i in np.arange(int(images.shape[0])) 
-                if (i not in i_test and i not in i_val)])
-        elif split == 'val':
-            all_idx = i_val
-        elif split == 'all':
-            all_idx = np.arange(images.shape[0])
-        else:
-            raise NotImplementedError
-
         self.logger.info('DEFINING BOUNDS')
         if no_ndc:
             self.near = bds.min() * 0.9
@@ -99,6 +87,21 @@ class LLFFDataset:
         else:
             self.near = 0.
             self.far = 1.
+
+        i_val = i_test
+        if split == "train":
+            all_idx = np.array([
+                i for i in np.arange(int(images.shape[0])) 
+                if (i not in i_test and i not in i_val)])
+            if not no_ndc:
+                self.near -= 0.05*(self.far-self.near)
+        elif split == 'val':
+            all_idx = i_val
+        elif split == 'all':
+            all_idx = np.arange(images.shape[0])
+        else:
+            raise NotImplementedError
+
         self.logger.info(f'NEAR {self.near} FAR {self.far}')
         self.logger.info(f'split {split} idx: {all_idx}')
 
@@ -150,12 +153,10 @@ class LLFFDataset:
                     'rays_color': target.view([-1,3]), 
                     'near': self.near, 'far': self.far}
 
-        select_mask = torch.zeros([self.h*self.w], device=rays_ori.device, dtype=torch.bool)
-        select_mask[torch.randperm(self.h*self.w)[:self.batch_size]] = 1
-        select_mask = select_mask.view([self.h,self.w])
-        rays_ori = rays_ori[select_mask]  # (N, 3)
-        rays_dir = rays_dir[select_mask]  # (N, 3)
-        rays_color = target[select_mask]  # (N, 3)
+        select_idx = torch.randperm(self.h*self.w, device=rays_ori.device)[:self.batch_size]
+        rays_ori = rays_ori.view([-1,3])[select_idx]  # (N, 3)
+        rays_dir = rays_dir.view([-1,3])[select_idx]  # (N, 3)
+        rays_color = target.view([-1,3])[select_idx]  # (N, 3)
 
         return {'rays_ori': rays_ori, 'rays_dir': rays_dir, 
                 'rays_color': rays_color, 'near': self.near, 'far': self.far}

@@ -3,7 +3,7 @@ from mmcv.runner import auto_fp16, force_fp32
 
 
 im2mse = lambda x, y : torch.mean((x - y) ** 2)
-mse2psnr = lambda x : -10 * torch.log(x) / torch.log(torch.as_tensor([10], dtype=torch.float32, device=x.device))
+mse2psnr = lambda x : -10 * torch.log(x) / torch.log(torch.as_tensor([10], device=x.device))
 
 
 def raw2outputs(alphas, colors, z_vals, rays_dir, alpha_noise_std, white_bkgd):
@@ -16,7 +16,7 @@ def raw2outputs(alphas, colors, z_vals, rays_dir, alpha_noise_std, white_bkgd):
     # the distance that starts from the last point is infinity.
     dists = torch.cat([
         dists, 
-        2e10 * torch.ones(dists[..., :1].shape, dtype=torch.float32, device=dists.device)
+        2e10 * torch.ones(dists[..., :1].shape, device=dists.device)
     ], dim=-1)  # [B, n_samples]
 
     # Multiplies each distance by the norm of its ray direction 
@@ -30,7 +30,7 @@ def raw2outputs(alphas, colors, z_vals, rays_dir, alpha_noise_std, white_bkgd):
     # regularize network (prevents floater artifacts).
     noise = 0
     if alpha_noise_std > 0:
-        noise = torch.randn(alphas.shape, dtype=torch.float32, device=alphas.device) * alpha_noise_std
+        noise = torch.randn(alphas.shape, device=alphas.device) * alpha_noise_std
 
     # Predicts density of point. Higher values imply
     # higher likelihood of being absorbed at this point.
@@ -42,11 +42,8 @@ def raw2outputs(alphas, colors, z_vals, rays_dir, alpha_noise_std, white_bkgd):
     # tf has an args: exclusive, but torch does not, so I have to do all these complicated staffs.
     # [B, n_points]    
     weights = alphas * torch.cumprod(
-        torch.cat([
-            torch.ones(tuple(alphas.shape[:-1]) + (1,), dtype=torch.float32, device=alphas.device), 
-            1 - alphas[..., :-1] + 1e-10], 
-            dim=-1
-        ),
+        torch.cat([torch.ones(tuple(alphas.shape[:-1]) + (1,), device=alphas.device), 
+                   1 - alphas[..., :-1] + 1e-10], dim=-1),
         dim=-1
     )
     # Computed weighted color of each sample y
@@ -77,41 +74,33 @@ def raw2outputs(alphas, colors, z_vals, rays_dir, alpha_noise_std, white_bkgd):
 
 
 # Hierarchical sampling (section 5.2)
-class SamplePDF(torch.nn.Module):
-    """fp32 for numerical reasons
-    """
-    def __init__(self):
-        super().__init__()
-        self.fp16_enabled = False
-    
-    @auto_fp16()
-    def forward(self, bins, weights, n_importance, deterministic=False):
-        # Get pdf
-        weights = weights + 1e-5  # prevent nan
-        pdf = weights / torch.sum(weights, -1, keepdim=True)
-        cdf = torch.cumsum(pdf, -1)
-        cdf = torch.cat([torch.zeros_like(cdf[...,:1]), cdf], -1)  # [B, len(bins)]
+def sample_pdf(bins, weights, n_importance, deterministic=False):
+    # Get pdf
+    weights = weights + 1e-5  # prevent nan
+    pdf = weights / torch.sum(weights, -1, keepdim=True)
+    cdf = torch.cumsum(pdf, -1)
+    cdf = torch.cat([torch.zeros_like(cdf[...,:1]), cdf], -1)  # [B, len(bins)]
 
-        # Take uniform samples
-        if deterministic:
-            t_vals = torch.linspace(0., 1., steps=n_importance, dtype=torch.float32, device=bins.device)
-            t_vals = t_vals.expand(tuple(cdf.shape[:-1]) + (n_importance,))
-        else:
-            t_vals = torch.rand(tuple(cdf.shape[:-1]) + (n_importance,), dtype=torch.float32, device=bins.device)
-        t_vals = t_vals.contiguous()
+    # Take uniform samples
+    if deterministic:
+        t_vals = torch.linspace(0., 1., steps=n_importance, device=bins.device)
+        t_vals = t_vals.expand(tuple(cdf.shape[:-1]) + (n_importance,))
+    else:
+        t_vals = torch.rand(tuple(cdf.shape[:-1]) + (n_importance,), device=bins.device)
+    t_vals = t_vals.contiguous()
 
-        # Invert CDF
-        indices = torch.searchsorted(cdf.detach(), t_vals)
-        lower = torch.max(torch.zeros_like(indices - 1), indices - 1)
-        upper = torch.min((cdf.shape[-1] - 1) * torch.ones_like(indices), indices)
-        indices_g = torch.stack([lower, upper], -1)  # [B, n_importance, 2]
+    # Invert CDF
+    indices = torch.searchsorted(cdf.detach(), t_vals)
+    lower = torch.max(torch.zeros_like(indices - 1), indices - 1)
+    upper = torch.min((cdf.shape[-1] - 1) * torch.ones_like(indices), indices)
+    indices_g = torch.stack([lower, upper], -1)  # [B, n_importance, 2]
 
-        matched_shape = [indices_g.shape[0], indices_g.shape[1], cdf.shape[-1]]
-        cdf_g = torch.gather(cdf.unsqueeze(1).expand(matched_shape), 2, indices_g)
-        bins_g = torch.gather(bins.unsqueeze(1).expand(matched_shape), 2, indices_g)
+    matched_shape = [indices_g.shape[0], indices_g.shape[1], cdf.shape[-1]]
+    cdf_g = torch.gather(cdf.unsqueeze(1).expand(matched_shape), 2, indices_g)
+    bins_g = torch.gather(bins.unsqueeze(1).expand(matched_shape), 2, indices_g)
 
-        denom = (cdf_g[...,1] - cdf_g[...,0])
-        denom = torch.where(denom < 1e-5, torch.ones_like(denom), denom)
-        t = (t_vals - cdf_g[...,0])/denom
-        samples = bins_g[...,0] + t * (bins_g[...,1]-bins_g[...,0])
-        return samples
+    denom = (cdf_g[...,1] - cdf_g[...,0])
+    denom = torch.where(denom < 1e-5, torch.ones_like(denom), denom)
+    t = (t_vals - cdf_g[...,0])/denom
+    samples = bins_g[...,0] + t * (bins_g[...,1]-bins_g[...,0])
+    return samples

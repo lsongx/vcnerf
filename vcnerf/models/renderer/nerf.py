@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import torch.distributed as dist
 
 from mmcv.runner import auto_fp16, force_fp32
-from vcnerf.core import im2mse, mse2psnr, raw2outputs, SamplePDF
+from vcnerf.core import im2mse, mse2psnr, raw2outputs, sample_pdf
 from ..builder import RENDERER, build_embedder, build_field
 
 
@@ -26,22 +26,8 @@ class NeRF(nn.Module):
         self.dir_embedder = build_embedder(dir_embedder)
         self.fine_field = build_field(fine_field)
         self.render_params = render_params
-        self.sample_pdf = SamplePDF()
         self.fp16_enabled = False
         self.iter = 0
-
-        # sanity checks
-        assert self.xyz_embedder.out_dims == coarse_field.xyz_emb_dims
-        if fine_field is not None:
-            assert self.xyz_embedder.out_dims == fine_field.xyz_emb_dims
-
-        if self.dir_embedder is None:
-            assert not self.coarse_field.use_dirs
-            assert self.fine_field is None or (not self.fine_field.use_dirs)
-
-            assert self.dir_embedder.out_dims == coarse_field.dir_emb_dims
-            if fine_field is not None:
-                assert self.dir_embedder.out_dims == fine_field.dir_emb_dims
 
     def _parse_losses(self, losses):
         log_vars = OrderedDict()
@@ -110,6 +96,8 @@ class NeRF(nn.Module):
                        rays_ori, rays_dir, rays_color, # loader output
                        n_samples, n_importance, perturb, alpha_noise_std, inv_depth, # render param
                        use_dirs, max_rays_num, near=0.0, far=1.0, white_bkgd=False):
+        self.n_importance = n_importance
+        self.perturb = perturb
         dtype = rays_dir.dtype
         device = rays_ori.device
         base_shape = list(rays_ori.shape[:-1])
@@ -141,75 +129,80 @@ class NeRF(nn.Module):
         
         # TODO: double check
         if use_dirs:
-            directions = F.normalize(rays_dir, p=2, dim=-1)
+            viewdirs = F.normalize(rays_dir, p=2, dim=-1)
+            # viewdirs = rays_dir
         else:
-            directions = None
+            viewdirs = None
         
-        # points in space to evaluate model at
-        points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
-            z_vals[..., :, None]  # [B, n_samples, 3] or [B, H, W, n_samples, 3]
-
         # Evaluates the model at the points
-        raw2outputs_params = {'z_vals': z_vals, 'rays_dir': rays_dir, 
-                              'alpha_noise_std': alpha_noise_std, 
+        raw2outputs_params = {'alpha_noise_std': alpha_noise_std, 
                               'white_bkgd': white_bkgd,}
-        coarse_outputs = self.forward_batchified(points, 
-                                                 directions, 
+        coarse_outputs = self.forward_batchified(rays_ori, 
+                                                 rays_dir, 
+                                                 z_vals, 
+                                                 viewdirs, 
                                                  self.coarse_field,
                                                  raw2outputs_params,
-                                                 max_rays_num=max_rays_num)
+                                                 max_rays_num)
 
         if n_importance>0 and self.fine_field is not None:
-            z_vals_mid = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
-            z_samples = self.sample_pdf(
-                z_vals_mid, coarse_outputs['weights'][..., 1:-1], n_importance, not perturb)
-            z_vals_fine, indices = torch.sort(torch.cat([z_vals, z_samples], dim=-1), dim=-1)
-            z_vals_fine = z_vals_fine.detach()
-
-            # points in space to evaluate model at
-            points = rays_ori[..., None, :] + rays_dir[..., None, :] * \
-                z_vals_fine[..., :, None]  # [B, n_importance, 3]
-
-            # Evaluates the model at the points
-            raw2outputs_params['z_vals'] = z_vals_fine
-            max_rays_num = int(max_rays_num * n_samples / (n_samples + n_importance))
-            fine_outputs = self.forward_batchified(points, 
-                                                   directions, 
+            fine_outputs = self.forward_batchified(rays_ori, 
+                                                   rays_dir, 
+                                                   z_vals, 
+                                                   viewdirs, 
                                                    self.fine_field,
                                                    raw2outputs_params,
-                                                   max_rays_num=max_rays_num)
+                                                   max_rays_num,
+                                                   coarse_outputs['weights'][...,1:-1])
         else:
             fine_outputs = None
         return {'fine': fine_outputs, 'coarse': coarse_outputs}
 
+    def sample_new_z_vals(self, z_vals, weights, start=None, end=None):
+        z_vals = z_vals[start:end]
+        if weights is None:
+            return z_vals
+        weights = weights[start:end]
+        z_vals_mid = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
+        z_samples = sample_pdf(z_vals_mid, weights, 
+                               self.n_importance, not self.perturb)
+        z_vals_fine, _ = torch.sort(torch.cat([z_vals, z_samples], dim=-1), dim=-1)
+        z_vals_fine = z_vals_fine.detach()
+        return z_vals_fine
+
     @auto_fp16()
     def forward_batchified(self, 
-                           points, directions, field,
-                           raw2outputs_params, max_rays_num,):
-        assert points.shape[0] == directions.shape[0], (
-            f'points: {points.shape}, directions: {directions.shape}')
-        nb_rays = points.shape[0]
+                           rays_ori, rays_dir, z_vals, 
+                           viewdirs, field, 
+                           raw2outputs_params, max_rays_num, weights=None):
+        nb_rays = rays_ori.shape[0]
         if nb_rays <= max_rays_num or self.training:
-            alphas, colors = self.forward_points(points, directions, field)
-            return raw2outputs(alphas, colors, **raw2outputs_params)
+            z_vals = self.sample_new_z_vals(z_vals, weights)
+            points = rays_ori[..., None, :] + \
+                     rays_dir[..., None, :] * \
+                     z_vals[..., :, None]
+            alphas, colors = self.forward_points(points, viewdirs, field)
+            return raw2outputs(alphas, colors, z_vals, rays_dir, **raw2outputs_params)
         else:
             outputs = []
             start = 0
-            end = max_rays_num
             while start < nb_rays:
+                end = min(start+max_rays_num, nb_rays)
                 assert start < end, 'start >= end ({:d}, {:d})'.format(start, end)
-                alphas, colors = self.forward_points(points[start: end, ...], 
-                                                     directions[start: end, ...], 
+                local_z_vals = self.sample_new_z_vals(z_vals, weights, start, end)
+                points = rays_ori[start:end, None, :] + \
+                         rays_dir[start:end, None, :] * \
+                         local_z_vals[..., :, None]
+                alphas, colors = self.forward_points(points, 
+                                                     viewdirs[start: end, ...], 
                                                      field,)
                 local_raw2outputs_params = {
-                    'z_vals': raw2outputs_params['z_vals'][start:end, ...],
-                    'rays_dir': raw2outputs_params['rays_dir'][start:end, ...],
-                    'alpha_noise_std': raw2outputs_params['alpha_noise_std'], 
-                    'white_bkgd': raw2outputs_params['white_bkgd'],}
+                    'z_vals': local_z_vals,
+                    'rays_dir': rays_dir[start:end, ...],
+                    **raw2outputs_params}
                 output = raw2outputs(alphas, colors, **local_raw2outputs_params)
                 outputs.append(output)
                 start += max_rays_num
-                end = min(end + max_rays_num, nb_rays)
             
             final_output = {}
             for k in output.keys():
@@ -220,21 +213,19 @@ class NeRF(nn.Module):
             return final_output
 
     @auto_fp16(apply_to=('points',))
-    def forward_points(self, points, directions, field):
+    def forward_points(self, points, viewdirs, field):
         shape = tuple(points.shape[:-1])  # [B, n_points]
         # [B, 3] -> [B, n_points, 3]
-        directions = directions[..., None, :].expand_as(points)
-        
-        points = points.reshape((-1, 3))
-        directions = directions.reshape((-1, 3))
-
-        xyz_embeds = self.xyz_embedder(points)
         if self.dir_embedder is None:
             dir_embeds = None
         else:
             assert self.dir_embedder is not None
-            dir_embeds = self.dir_embedder(directions)
+            viewdirs = viewdirs[..., None, :].expand_as(points)
+            viewdirs = viewdirs.reshape((-1, 3))    
+            dir_embeds = self.dir_embedder(viewdirs)
 
+        points = points.reshape((-1, 3))
+        xyz_embeds = self.xyz_embedder(points)
         alphas, colors = field(xyz_embeds, dir_embeds)
         alphas = alphas.reshape(shape + (1,))
         colors = colors.reshape(shape + (3,))

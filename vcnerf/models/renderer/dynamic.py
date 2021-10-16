@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import torch.distributed as dist
 
 from mmcv.runner import auto_fp16, force_fp32
-from vcnerf.core import im2mse, mse2psnr, raw2outputs, SamplePDF
+from vcnerf.core import im2mse, mse2psnr, raw2outputs, sample_pdf
 from ..builder import RENDERER, build_embedder, build_field
 from .nerf import NeRF
 
@@ -39,16 +39,16 @@ class DynamicNeRF(NeRF):
     @auto_fp16(apply_to=('points',))
     def forward_points(self, 
                        points, 
-                       directions=None, 
+                       viewdirs=None, 
                        run_coarse=True, 
                        run_fine=True,
                        **kwargs):
         shape = tuple(points.shape[:-1])  # [B, n_points]
         # [B, 3] -> [B, n_points, 3]
-        directions = directions[..., None, :].expand_as(points)
+        viewdirs = viewdirs[..., None, :].expand_as(points)
         
         points = points.reshape((-1, 3))
-        directions = directions.reshape((-1, 3))
+        viewdirs = viewdirs.reshape((-1, 3))
 
         if not run_coarse and not run_fine:
             raise ValueError('One or both run_coarse and run_fine should be True')
@@ -60,7 +60,7 @@ class DynamicNeRF(NeRF):
             dir_embeds = None
         else:
             assert self.dir_embedder is not None
-            dir_embeds = self.dir_embedder(directions)
+            dir_embeds = self.dir_embedder(viewdirs)
 
         if run_coarse:
             coarse_dxyz = self.coarse_field(xyz_embeds, t_embeds)
