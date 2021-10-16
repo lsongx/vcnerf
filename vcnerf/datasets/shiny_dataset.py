@@ -1,4 +1,5 @@
 import os
+import math
 import numpy as np
 from skimage import io
 import torch
@@ -9,10 +10,11 @@ from .builder import DATASETS
 
 
 def get_rays(h, w, px, py, fx, fy, c2w):
+    device = c2w.device
     i, j = torch.meshgrid(torch.linspace(0, w-1, w), torch.linspace(0, h-1, h))  # pytorch's meshgrid has indexing='ij'
-    i = i.t()
-    j = j.t()
-    dirs = torch.stack([(i-px)/fx, -(j-py)/fy, -torch.ones_like(i)], -1)
+    i = i.t().to(device)
+    j = j.t().to(device)
+    dirs = torch.stack([(i-px)/fx, -(j-py)/fy, -torch.ones_like(i, device=device)], -1)
     # Rotate ray directions from camera frame to the world frame
     rays_d = torch.sum(dirs[..., None, :] * c2w[:3,:3], -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
     # Translate camera frame's origin to the world frame. It is the origin of all rays.
@@ -27,7 +29,10 @@ class ShinyDataset(object):
                  llff_width,
                  batch_size,
                  split,
+                 scale=None,
                  cache_size=50,
+                 to_cuda=False,
+                 batching=False,
                  holdout=8,):
         super().__init__()
         self.logger = get_root_logger()
@@ -37,7 +42,8 @@ class ShinyDataset(object):
                 for f in sorted(os.listdir(os.path.join(self.base_dir, 'images')))
                 if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png')][0]
         sh = io.imread(img0).shape
-        scale = float(llff_width / sh[1])
+        if scale is None:
+            scale = float(llff_width / sh[1])
 
         self.orbiter_dataset = OrbiterDataset(self.base_dir, 
                                               ref_img='', 
@@ -60,37 +66,79 @@ class ShinyDataset(object):
         self.near = self.orbiter_dataset.sfm.dmin
         self.far = self.orbiter_dataset.sfm.dmax
         self.batch_size = batch_size
+        self.to_cuda = to_cuda
+        self.batching = batching
+        self.load_all = cache_size >= len(self.valid_idx)
+        if self.load_all:
+            self.all_item = []
+            for i in self.valid_idx:
+                item = self.orbiter_dataset[i]
+                item['ori_pose'] = torch.tensor(item['ori_pose'])
+                item['image'] = torch.tensor(item['image']).permute([1,2,0])
+                if self.to_cuda:
+                    item['ori_pose'].cuda()
+                    item['image'].cuda()
+                self.all_item.append(item)
+        self.length = len(self.valid_idx)
+        if self.batching:
+            assert self.load_all, 'loading all images are necessary for batching'
+            all_rays_ori, all_rays_dir, all_rays_color = [], [], []
+            self.logger.info(f'creating all rays')
+            for item in self.all_item:
+                ro, rd = get_rays(self.h, self.w, 
+                                  item['px'], item['py'], 
+                                  item['fx'], item['fy'],
+                                  item['ori_pose'],)
+                all_rays_ori.append(ro)
+                all_rays_dir.append(rd)
+                all_rays_color.append(item['image'])
+            self.logger.info(f'finish creating all rays')
+            self.all_rays_ori = torch.stack(all_rays_ori, dim=0).view([-1,3])
+            self.all_rays_dir = torch.stack(all_rays_dir, dim=0).view([-1,3])
+            self.all_rays_color = torch.stack(all_rays_color, dim=0).view([-1,3])
+            self.length = self.all_rays_color.shape[0]
 
     def __len__(self):
-        return len(self.valid_idx)
+        return self.length
 
     def __getitem__(self, idx):
-        idx = self.valid_idx[idx]
-        item = self.orbiter_dataset[idx]
-
+        if not self.load_all:
+            idx = self.valid_idx[idx]
+            item = self.orbiter_dataset[idx]
+            item['image'] = torch.tensor(item['image']).permute([1,2,0])
+        else:
+            if self.batching:
+                return {'rays_ori': self.all_rays_ori[idx],
+                        'rays_dir': self.all_rays_dir[idx],
+                        'rays_color': self.all_rays_color[idx],
+                        'near': self.near, 'far': self.far}
+            item = self.all_item[idx]
         rays_ori, rays_dir = get_rays(self.h, self.w, 
-                                      item['px'], item['py'], 
-                                      item['fx'], item['fy'],
-                                      item['ori_pose'],)
-                                    #   item['r'], item['t'],)
-        rays_color = torch.tensor(item['image']).permute([1,2,0])
-        
+                                        item['px'], item['py'], 
+                                        item['fx'], item['fy'],
+                                        item['ori_pose'],)
+        rays_color = item['image']
+
         if self.batch_size == -1:
             return {'rays_ori': rays_ori.view([-1,3]),
                     'rays_dir': rays_dir.view([-1,3]),
                     'rays_color': rays_color.view([-1,3]),
                     'near': self.near, 'far': self.far}
 
-        coords = torch.stack(torch.meshgrid(
-            torch.linspace(0, self.h-1, self.h), 
-            torch.linspace(0, self.w-1, self.w)), -1)
+        select_idx = torch.randperm(self.h*self.w)[:self.batch_size]
+        rays_ori = rays_ori[select_idx]  # (N, 3)
+        rays_dir = rays_dir[select_idx]  # (N, 3)
+        rays_color = rays_color[select_idx]  # (N, 3)
 
-        coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
-        select_inds = np.random.choice(coords.shape[0], size=[self.batch_size], replace=False)  # (N,)
-        select_coords = coords[select_inds].long()  # (N, 2)
-        rays_ori = rays_ori[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
-        rays_dir = rays_dir[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
-        rays_color = rays_color[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
+        # coords = torch.stack(torch.meshgrid(
+        #     torch.linspace(0, self.h-1, self.h), 
+        #     torch.linspace(0, self.w-1, self.w)), -1)
+        # coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
+        # select_inds = np.random.choice(coords.shape[0], size=[self.batch_size], replace=False)  # (N,)
+        # select_coords = coords[select_inds].long()  # (N, 2)
+        # rays_ori = rays_ori[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
+        # rays_dir = rays_dir[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
+        # rays_color = rays_color[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
 
         return {'rays_ori': rays_ori, 'rays_dir': rays_dir, 
                 'rays_color': rays_color, 'near': self.near, 'far': self.far}

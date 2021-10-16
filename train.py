@@ -157,7 +157,7 @@ def main():
         set_random_seed(args.seed, deterministic=args.deterministic)
     cfg.seed = args.seed
     meta['seed'] = args.seed
-    meta['exp_name'] = osp.basename(args.config)
+    meta['exp_name'] = osp.basename(args.config)+f' workdir: {cfg.work_dir}'
 
     model = build_renderer(cfg.model)
 

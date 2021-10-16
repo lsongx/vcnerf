@@ -85,7 +85,7 @@ checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 log_config = dict(
     interval=1000,
     hooks=[
-        dict(type='TextLoggerHook'),
+        dict(type='TextLoggerHook', interval_exp_name=10000),
         # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(

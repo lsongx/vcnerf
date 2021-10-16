@@ -36,8 +36,8 @@ model = dict(
         n_importance=128,
         perturb=True,
         alpha_noise_std=1.0,
-        inv_depth=False,
-        # inv_depth=True,
+        # inv_depth=False,
+        inv_depth=True,
         use_dirs=True,
         max_rays_num=1024*3,))
 
@@ -92,7 +92,7 @@ checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 log_config = dict(
     interval=1000,
     hooks=[
-        dict(type='TextLoggerHook'),
+        dict(type='TextLoggerHook', interval_exp_name=10000),
         # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
@@ -102,8 +102,8 @@ evaluation = dict(
         n_importance=128,
         perturb=False,
         alpha_noise_std=0,
-        inv_depth=False,
-        # inv_depth=True,
+        # inv_depth=False,
+        inv_depth=True,
         use_dirs=True,
         max_rays_num=1024*2,))
 dist_params = dict(backend='nccl')

@@ -14,6 +14,7 @@ model = dict(
         type='BaseEmbedder',
         in_dims=3, 
         n_freqs=4, 
+        scale=64,
         include_input=False),
     coarse_field=dict(
         type='BaseField',
@@ -41,26 +42,29 @@ model = dict(
 
 # dataset settings
 data = dict(
-    samples_per_gpu=1,
+    samples_per_gpu=1024*5,
     workers_per_gpu=5,
     train=dict(
         type='RepeatDataset',
         dataset=dict(
             type='ShinyDataset',
-            base_dir='~/data/3d/shiny/tools',
+            base_dir='~/data/3d/nerf/nex_llff_data/fern_undistort',
             llff_width=1008,
-            # batch_size=1024*3,
-            batch_size=1024*6, #V100
+            batch_size=None,
             split='train',
+            batching=True,
+            to_cuda=True,
             cache_size=512,
             holdout=8),
-        times=50),
+        times=1),
     val=dict(
         type='ShinyDataset',
-        base_dir='~/data/3d/shiny/tools',
+        base_dir='~/data/3d/nerf/nex_llff_data/fern_undistort',
         llff_width=1008,
         batch_size=-1,
         split='val',
+        batching=False,
+        to_cuda=True,
         cache_size=512,
         holdout=8),)
 
@@ -71,7 +75,9 @@ optimizer_config = dict(grad_clip=None)
 # lr_config = dict(policy='Exp', gamma=0.1**((1/1000)*(1/250)), by_epoch=False) 
 # lr_config = dict(policy='Step', step=[40,80,120,160,180], gamma=0.5, by_epoch=True)
 # runner = dict(type='EpochBasedRunner', max_epochs=200)
-lr_config = dict(policy='Step', step=[20,40,60,80], gamma=0.5, by_epoch=True)
+# lr_config = dict(policy='Step', step=[20,40,60,80], gamma=0.5, by_epoch=True)
+# runner = dict(type='EpochBasedRunner', max_epochs=100)
+lr_config = dict(policy='Poly', power=2, min_lr=5e-6, by_epoch=True)
 runner = dict(type='EpochBasedRunner', max_epochs=100)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=5)
