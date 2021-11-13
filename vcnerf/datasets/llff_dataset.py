@@ -56,6 +56,7 @@ class LLFFDataset:
                  spherify, 
                  no_ndc, 
                  holdout,
+                 select_img=None,
                  batching=True,
                  to_cuda=False,
                  llff_data_param={}):
@@ -63,7 +64,7 @@ class LLFFDataset:
         self.batch_size = batch_size
         self.no_ndc = no_ndc
         datadir = os.path.expanduser(datadir)
-        images, poses, bds, render_poses, i_test = load_llff_data(
+        images, poses, bds, render_poses, i_test, imgfiles = load_llff_data(
             datadir, factor, recenter=True, bd_factor=.75, spherify=spherify, **llff_data_param)
         self.hwf = poses[0, :3, -1]
         self.h = int(self.hwf[0])
@@ -93,17 +94,25 @@ class LLFFDataset:
             all_idx = np.array([
                 i for i in np.arange(int(images.shape[0])) 
                 if (i not in i_test and i not in i_val)])
-            if not no_ndc:
-                self.near -= 0.05*(self.far-self.near)
+            # if not no_ndc:
+            #     self.near -= 0.05*(self.far-self.near)
         elif split == 'val':
             all_idx = i_val
         elif split == 'all':
             all_idx = np.arange(images.shape[0])
         else:
             raise NotImplementedError
-
-        self.logger.info(f'NEAR {self.near} FAR {self.far}')
+        if select_img is not None:
+            all_idx = []
+            img_name = []
+            for img in select_img:
+                for idx, f in enumerate(imgfiles):
+                    if img in f:
+                        img_name.append(f)
+                        all_idx.append(idx)
+            self.logger.info(f'split {split} selected names: {img_name}')
         self.logger.info(f'split {split} idx: {all_idx}')
+        self.logger.info(f'NEAR {self.near} FAR {self.far}')
 
         self.imgs = torch.tensor(images[all_idx])
         self.poses = torch.tensor(self.poses[all_idx])

@@ -33,6 +33,8 @@ h = val_dataset.h
 w = val_dataset.w
 
 test_dataset = val_dataset
+near = test_dataset.near
+far = test_dataset.far
 num_images = len(test_dataset)
 model.eval()
 for i in range(num_images):
@@ -58,8 +60,8 @@ for i in range(num_images):
     fig, axes = plt.subplots(2, 2, figsize=(8,8), dpi=256)
     axes[0,0].imshow(coarse_im); axes[0,0].set_title('coarse_im')
     axes[0,1].imshow(fine_im); axes[0,1].set_title('fine_im')
-    im0 = axes[1,0].imshow(coarse_depth, vmin=0, vmax=1); axes[1,0].set_title('coarse_depth')
-    im1 = axes[1,1].imshow(fine_depth, vmin=0, vmax=1); axes[1,1].set_title('fine_depth')
+    im0 = axes[1,0].imshow(coarse_depth, vmin=near, vmax=far); axes[1,0].set_title('coarse_depth')
+    im1 = axes[1,1].imshow(fine_depth, vmin=near, vmax=far); axes[1,1].set_title('fine_depth')
     # axes[1,0].imshow(coarse_acc); axes[1,0].set_title('coarse_acc')
     # axes[1,1].imshow(fine_acc); axes[1,1].set_title('fine_acc')
     fig.savefig(f'{base}/tmp{i}.png', format='png')

@@ -81,7 +81,7 @@ log_config = dict(
         # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
-    interval=2500,
+    interval=1,
     render_params=dict(
         n_samples=64,
         n_importance=128,

@@ -110,12 +110,12 @@ class NeRF(nn.Module):
                 near, far, n_samples, 
                 dtype=dtype, device=device).expand([*base_shape, n_samples])
         else:
-            z_vals = torch.linspace(0, 1, n_samples, dtype=dtype, device=device)
-            z_vals = z_vals.pow(0.5).expand([*base_shape, n_samples])
-            z_vals = near*z_vals+far*(1-z_vals)
-            # z_vals = 1/torch.linspace(
-            #     1, near/far, n_samples, 
-            #     dtype=dtype, device=device).expand([*base_shape, n_samples])*near
+            # z_vals = torch.linspace(0, 1, n_samples, dtype=dtype, device=device)
+            # z_vals = z_vals.pow(0.5).expand([*base_shape, n_samples])
+            # z_vals = near*z_vals+far*(1-z_vals)
+            z_vals = 1/torch.linspace(
+                1, near/far, n_samples, 
+                dtype=dtype, device=device).expand([*base_shape, n_samples])*near
 
         # Perturbs points coordinates
         if perturb:

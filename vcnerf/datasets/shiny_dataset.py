@@ -22,6 +22,30 @@ def get_rays(h, w, px, py, fx, fy, c2w):
     return rays_o, rays_d
 
 
+def ndc_rays(H, W, fx, fy, near, rays_o, rays_d):
+    """Normalized device coordinate rays.
+    """
+    # Shift ray origins to near plane
+    t = -(near + rays_o[..., 2]) / rays_d[..., 2]
+    rays_o = rays_o + t[..., None] * rays_d
+
+    # Projection
+    o0 = -1./(W/(2.*fx)) * rays_o[..., 0] / rays_o[..., 2]
+    o1 = -1./(H/(2.*fy)) * rays_o[..., 1] / rays_o[..., 2]
+    o2 = 1. + 2. * near / rays_o[..., 2]
+
+    d0 = -1./(W/(2.*fx)) * \
+        (rays_d[..., 0]/rays_d[..., 2] - rays_o[..., 0]/rays_o[..., 2])
+    d1 = -1./(H/(2.*fy)) * \
+        (rays_d[..., 1]/rays_d[..., 2] - rays_o[..., 1]/rays_o[..., 2])
+    d2 = -2. * near / rays_o[..., 2]
+
+    rays_o = torch.stack([o0, o1, o2], -1)
+    rays_d = torch.stack([d0, d1, d2], -1)
+
+    return rays_o, rays_d
+
+
 @DATASETS.register_module()
 class ShinyDataset(object):
     def __init__(self, 
@@ -33,6 +57,7 @@ class ShinyDataset(object):
                  cache_size=50,
                  to_cuda=False,
                  batching=False,
+                 no_ndc=True,
                  holdout=8,):
         super().__init__()
         self.logger = get_root_logger()
@@ -53,7 +78,8 @@ class ShinyDataset(object):
                                               invz=False, 
                                               render_style='shiny',
                                               cache_size=cache_size,
-                                              offset=0,)
+                                              offset=0,
+                                              cv2resize=True)
         all_idx = list(range(len(self.orbiter_dataset)))
         if split == 'train':
             self.valid_idx = list(set(all_idx)-set(all_idx[::holdout]))
@@ -61,13 +87,21 @@ class ShinyDataset(object):
             self.valid_idx = all_idx[::holdout]
         self.logger.info(f'{split} index: {self.valid_idx}')
 
-        self.h = self.orbiter_dataset[0]['height']
-        self.w = self.orbiter_dataset[0]['width']
+        item = self.orbiter_dataset[0]
+        self.h = item['height']
+        self.w = item['width']
         self.near = self.orbiter_dataset.sfm.dmin
         self.far = self.orbiter_dataset.sfm.dmax
+        if not no_ndc:
+            self.near = 0.
+            self.far = 1.
+            self.fx = item['fx']
+            self.fy = item['fy']
+            self.logger.info(f'ndc params: fx {self.fx} fy {self.fy}')
         self.batch_size = batch_size
         self.to_cuda = to_cuda
         self.batching = batching
+        self.no_ndc = no_ndc
         self.load_all = cache_size >= len(self.valid_idx)
         if self.load_all:
             self.all_item = []
@@ -96,6 +130,10 @@ class ShinyDataset(object):
             self.all_rays_ori = torch.stack(all_rays_ori, dim=0).view([-1,3])
             self.all_rays_dir = torch.stack(all_rays_dir, dim=0).view([-1,3])
             self.all_rays_color = torch.stack(all_rays_color, dim=0).view([-1,3])
+            if not self.no_ndc:
+                self.all_rays_ori, self.all_rays_dir = ndc_rays(
+                    self.h, self.w, self.fx, self.fy, 1., 
+                    self.all_rays_ori, self.all_rays_dir)
             self.length = self.all_rays_color.shape[0]
 
     def __len__(self):
@@ -117,6 +155,9 @@ class ShinyDataset(object):
                                         item['px'], item['py'], 
                                         item['fx'], item['fy'],
                                         item['ori_pose'],)
+        if not self.no_ndc:
+            rays_ori, rays_dir = ndc_rays(
+                self.h, self.w, self.fx, self.fy, 1., rays_ori, rays_dir)
         rays_color = item['image']
 
         if self.batch_size == -1:
@@ -126,19 +167,9 @@ class ShinyDataset(object):
                     'near': self.near, 'far': self.far}
 
         select_idx = torch.randperm(self.h*self.w)[:self.batch_size]
-        rays_ori = rays_ori[select_idx]  # (N, 3)
-        rays_dir = rays_dir[select_idx]  # (N, 3)
-        rays_color = rays_color[select_idx]  # (N, 3)
-
-        # coords = torch.stack(torch.meshgrid(
-        #     torch.linspace(0, self.h-1, self.h), 
-        #     torch.linspace(0, self.w-1, self.w)), -1)
-        # coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
-        # select_inds = np.random.choice(coords.shape[0], size=[self.batch_size], replace=False)  # (N,)
-        # select_coords = coords[select_inds].long()  # (N, 2)
-        # rays_ori = rays_ori[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
-        # rays_dir = rays_dir[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
-        # rays_color = rays_color[select_coords[:, 0], select_coords[:, 1]]  # (N, 3)
+        rays_ori = rays_ori.view([-1,3])[select_idx]  # (N, 3)
+        rays_dir = rays_dir.view([-1,3])[select_idx]  # (N, 3)
+        rays_color = rays_color.view([-1,3])[select_idx]  # (N, 3)
 
         return {'rays_ori': rays_ori, 'rays_dir': rays_dir, 
                 'rays_color': rays_color, 'near': self.near, 'far': self.far}

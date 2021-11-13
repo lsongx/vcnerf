@@ -325,6 +325,6 @@ def load_llff_data(basedir,
     images = images.astype(np.float32)
     poses = poses.astype(np.float32)
 
-    return images, poses, bds, render_poses, i_test
+    return images, poses, bds, render_poses, i_test, imgfiles
 
 

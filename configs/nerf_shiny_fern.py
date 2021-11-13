@@ -53,6 +53,7 @@ data = dict(
             batch_size=None,
             split='train',
             batching=True,
+            no_ndc=False,
             to_cuda=True,
             cache_size=512,
             holdout=8),
@@ -64,6 +65,7 @@ data = dict(
         batch_size=-1,
         split='val',
         batching=False,
+        no_ndc=False,
         to_cuda=True,
         cache_size=512,
         holdout=8),)
@@ -82,13 +84,13 @@ runner = dict(type='EpochBasedRunner', max_epochs=100)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 log_config = dict(
-    interval=200,
+    interval=1000,
     hooks=[
         dict(type='TextLoggerHook', interval_exp_name=10000),
         # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
-    interval=2500, # every 2500 iterations
+    interval=1,
     render_params=dict(
         n_samples=64,
         n_importance=128,
