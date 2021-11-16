@@ -11,6 +11,7 @@ import mmcv
 from mmcv.runner import Hook, obj_from_dict
 from mmcv.parallel import scatter, collate
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 import tensorflow as tf
 import lpips
 
@@ -154,15 +155,15 @@ class DistEvalHook(Hook):
             im = 255 * im_ori.detach().cpu().numpy()
             cv2.imwrite(save_dir+'-coarse.png', im[:,:,::-1])
             if outputs['fine'] is not None:
-                im = outputs['fine']['color_map'].reshape(self.im_shape)
-                im = 255 * im.detach().cpu().numpy()
+                im_ori_fine = outputs['fine']['color_map'].reshape(self.im_shape)
+                im = 255 * im_ori_fine.detach().cpu().numpy()
                 cv2.imwrite(save_dir+'-fine.png', im[:,:,::-1])
             gt_ori = rays['rays_color'].reshape(self.im_shape)
             gt = 255 * gt_ori.detach().cpu().numpy()
             cv2.imwrite(osp.join(self.out_dir, f'gt-id{runner.rank+i}.png'), gt[:,:,::-1])
 
             gt_lpips = gt_ori.cpu().permute([2,0,1]) * 2.0 - 1.0
-            predict_image_lpips = im_ori.cpu().permute([2,0,1]).clamp(0,1) * 2.0 - 1.0
+            predict_image_lpips = im_ori_fine.cpu().permute([2,0,1]).clamp(0,1) * 2.0 - 1.0
             lpips_score += self.lpips_model.forward(predict_image_lpips, gt_lpips).cpu().detach().item()
 
             gt_load = tf.image.decode_image(tf.io.read_file(osp.join(self.out_dir, f'gt-id{runner.rank+i}.png')))
