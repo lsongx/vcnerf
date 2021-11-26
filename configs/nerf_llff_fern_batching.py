@@ -8,14 +8,12 @@ model = dict(
         type='BaseEmbedder',
         in_dims=3, 
         n_freqs=10, 
-        # include_input=True),
         include_input=False),
     dir_embedder=dict(
         type='BaseEmbedder',
         in_dims=3, 
         n_freqs=4, 
-        scale=128,
-        # include_input=True),
+        scale=64,
         include_input=False),
     coarse_field=dict(
         type='BaseField',
@@ -37,7 +35,6 @@ model = dict(
         perturb=True,
         alpha_noise_std=1.0,
         inv_depth=False,
-        # inv_depth=True,
         use_dirs=True,
         max_rays_num=1024*3,))
 
@@ -45,7 +42,7 @@ model = dict(
 data = dict(
     samples_per_gpu=1024*4,
     workers_per_gpu=16,
-    train=dict(        
+    train=dict(
         type='RepeatDataset',
         dataset=dict(
             type='LLFFDataset',
@@ -73,20 +70,10 @@ data = dict(
 
 # optimizer
 optimizer = dict(type='Adam', lr=5e-4, betas=(0.9, 0.999))
-# optimizer = dict(type='Adam', lr=1e-3, betas=(0.9, 0.999))
-# optimizer = dict(type='AdamW', lr=1e-3)
 optimizer_config = dict(grad_clip=None)
 # learning policy
-# lr_config = dict(policy='Exp', gamma=0.1**((1/1000)*(1/250)), by_epoch=False) 
-# lr_config = dict(policy='Step', step=[40,80,120,160,180], gamma=0.5, by_epoch=True)
-# runner = dict(type='EpochBasedRunner', max_epochs=200)
-# lr_config = dict(policy='Step', step=[20,40,60,80,90], gamma=0.5, by_epoch=True)
-# lr_config = dict(policy='Step', step=[50,80,90], gamma=0.5, by_epoch=True)
-# runner = dict(type='EpochBasedRunner', max_epochs=100)
-lr_config = dict(policy='Poly', power=2, min_lr=5e-6, by_epoch=True)
+lr_config = dict(policy='Poly', power=1, min_lr=5e-6, by_epoch=True)
 runner = dict(type='EpochBasedRunner', max_epochs=100)
-# lr_config = dict(policy='Step', step=[100,200,300], gamma=0.5, by_epoch=True)
-# runner = dict(type='EpochBasedRunner', max_epochs=300)
 # misc settings
 checkpoint_config = dict(interval=1, max_keep_ckpts=5)
 log_config = dict(
@@ -103,7 +90,6 @@ evaluation = dict(
         perturb=False,
         alpha_noise_std=0,
         inv_depth=False,
-        # inv_depth=True,
         use_dirs=True,
         max_rays_num=1024*2,))
 dist_params = dict(backend='nccl')

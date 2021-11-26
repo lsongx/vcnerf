@@ -73,6 +73,7 @@ class SyntheticDataset(object):
                  batch_size,
                  white_bkgd=True,
                  precrop_frac=1,
+                 num_render_img=40,
                  testskip=8,):
         super().__init__()
         self.logger = get_root_logger()
@@ -83,6 +84,7 @@ class SyntheticDataset(object):
         self.white_bkgd = white_bkgd
         self.precrop_frac = precrop_frac
         self.testskip = testskip
+        self.num_render_img = num_render_img
 
         self.__init_dataset()
 
@@ -110,7 +112,7 @@ class SyntheticDataset(object):
         self.focal = .5 * self.w / np.tan(.5 * camera_angle_x)
         self.render_poses = torch.stack(
             [pose_spherical(angle, -30.0, 4.0) 
-            for angle in np.linspace(-180,180,40+1)[:-1]], 0)
+            for angle in np.linspace(-180,180,self.num_render_img+1)[:-1]], 0)
     
         self.h = int(self.h)
         self.w = int(self.w)
@@ -140,7 +142,10 @@ class SyntheticDataset(object):
         return len(self.poses)
 
     def __getitem__(self, idx):
-        target = self.imgs[idx]
+        if idx >= len(self.imgs):
+            target = self.imgs[0]
+        else:
+            target = self.imgs[idx]
         pose = self.poses[idx, :3,:4]
         rays_ori, rays_dir = get_rays(self.h, self.w, self.focal, pose)
 
