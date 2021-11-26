@@ -21,27 +21,30 @@ class EvalHook(Hook):
     def __init__(self,
                  dataloader,
                  render_params,
-                 interval=1,
+                 epoch_interval=1,
+                 iter_interval=5e3,
                  out_dir=None,
                  logger=None):
         self.dataloader = dataloader
         self.render_params = render_params
-        self.interval = interval
+        self.epoch_interval = epoch_interval
+        self.iter_interval = iter_interval
         self.out_dir = out_dir
         self.logger = logger
         self.best_psnr = 0
         self.im_shape = (
             dataloader.dataset.h, dataloader.dataset.w, 3)
 
-    def after_train_epoch(self, runner):
-        if not self.every_n_epochs(runner, self.interval):
+    # def after_train_epoch(self, runner):
+    #     if not self.every_n_epochs(runner, self.epoch_interval):
+    #         return
+    def after_train_iter(self, runner):
+        if not self.every_n_iters(runner, self.iter_interval):
             return
         if not self.out_dir:
             self.out_dir = runner.work_dir
         psnr = self.evaluate(runner)
-        is_best = False
         if psnr > self.best_psnr:
-            is_best = True
             old_filename = f'checkpoint_{self.best_psnr:.2f}.pth'
             if os.path.isfile(osp.join(self.out_dir, old_filename)):
                 os.remove(osp.join(self.out_dir, old_filename))
@@ -96,12 +99,14 @@ class DistEvalHook(Hook):
     def __init__(self,
                  dataloader,
                  render_params,
-                 interval=1,
+                 epoch_interval=1,
+                 iter_interval=5e3,
                  out_dir=None,
                  logger=None):
         self.dataloader = dataloader
         self.render_params = render_params
-        self.interval = interval
+        self.epoch_interval = epoch_interval
+        self.iter_interval = iter_interval
         self.out_dir = out_dir
         self.logger = logger
         self.best_psnr = 0
@@ -110,16 +115,17 @@ class DistEvalHook(Hook):
             int(dataloader.dataset.h), int(dataloader.dataset.w), 3)
         self.lpips_model = lpips.LPIPS(net='vgg')
 
-    def after_train_epoch(self, runner):
-        if not self.every_n_epochs(runner, self.interval):
+    # def after_train_epoch(self, runner):
+    #     if not self.every_n_epochs(runner, self.epoch_interval):
+    #         return
+    def after_train_iter(self, runner):
+        if not self.every_n_iters(runner, self.iter_interval):
             return
         if not self.out_dir:
             self.out_dir = runner.work_dir
         psnr = self.evaluate(runner)
         if runner.rank == 0:
-            is_best = False
             if psnr > self.best_psnr:
-                is_best = True
                 old_filename = f'checkpoint_{self.best_psnr:.2f}.pth'
                 if os.path.isfile(osp.join(self.out_dir, old_filename)):
                     os.remove(osp.join(self.out_dir, old_filename))
@@ -128,7 +134,7 @@ class DistEvalHook(Hook):
                 if self.logger is not None:
                     self.logger.info(f'Saving best {self.bestname}.')
                 torch.save(runner.model.state_dict(), 
-                        osp.join(self.out_dir, self.bestname))
+                           osp.join(self.out_dir, self.bestname))
             else:
                 self.logger.info(f'Current best {self.bestname}.')
         dist.barrier()

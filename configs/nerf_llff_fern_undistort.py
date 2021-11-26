@@ -75,7 +75,7 @@ optimizer_config = dict(grad_clip=None)
 lr_config = dict(policy='Step', step=[20,40,60,80,90], gamma=0.5, by_epoch=True)
 runner = dict(type='EpochBasedRunner', max_epochs=100)
 # misc settings
-checkpoint_config = dict(interval=1, max_keep_ckpts=5)
+checkpoint_config = dict(interval=5e3, by_epoch=False, max_keep_ckpts=5)
 log_config = dict(
     interval=200,
     hooks=[

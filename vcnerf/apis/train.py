@@ -98,8 +98,8 @@ def train_renderer(model,
     runner.register_training_hooks(cfg.lr_config, optimizer_config,
                                    cfg.checkpoint_config, cfg.log_config,
                                    cfg.get('momentum_config', None))
-    if distributed:
-        runner.register_hook(DistSamplerSeedHook())
+    # if distributed:
+    #     runner.register_hook(DistSamplerSeedHook())
 
     # register eval hooks
     if validate:
@@ -107,7 +107,7 @@ def train_renderer(model,
         val_dataloader = build_dataloader(
             val_dataset,
             samples_per_gpu=1,
-            workers_per_gpu=1,
+            workers_per_gpu=0,
             dist=distributed,
             shuffle=False)
         eval_cfg = cfg.get('evaluation', {})
@@ -115,11 +115,9 @@ def train_renderer(model,
         runner.register_hook(
             eval_hook(val_dataloader, logger=logger, **eval_cfg))
 
-    for param_adjust_hook in cfg.get('param_adjust_hooks', []):
-        param_adjust_hook['logger'] = logger
-        runner.register_hook(
-            obj_from_dict(param_adjust_hook, vcnerf.core.hooks))
-    runner.register_hook(vcnerf.core.hooks.IterAdjustHook(logger))
+    for hook in cfg.get('extra_hooks', []):
+        hook['logger'] = logger
+        runner.register_hook(obj_from_dict(hook, vcnerf.core.hooks))
 
     if cfg.resume_from:
         runner.resume(cfg.resume_from)

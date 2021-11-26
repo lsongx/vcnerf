@@ -90,7 +90,7 @@ runner = dict(type='EpochBasedRunner', max_epochs=100)
 # lr_config = dict(policy='Step', step=[100,200,300], gamma=0.5, by_epoch=True)
 # runner = dict(type='EpochBasedRunner', max_epochs=300)
 # misc settings
-checkpoint_config = dict(interval=1, max_keep_ckpts=5)
+checkpoint_config = dict(interval=5e3, by_epoch=False, max_keep_ckpts=5)
 log_config = dict(
     interval=200,
     hooks=[
@@ -98,7 +98,8 @@ log_config = dict(
         # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
-    interval=1,
+    epoch_interval=1,
+    iter_interval=5e3,
     render_params=dict(
         n_samples=64,
         n_importance=128,

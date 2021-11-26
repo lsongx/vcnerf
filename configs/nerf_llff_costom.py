@@ -50,8 +50,10 @@ data = dict(
             factor=8, 
             batch_size=1024*2,
             split='train', 
+            batching=True, 
             spherify=False, 
-            no_ndc=True, 
+            no_ndc=False, 
+            to_cuda=True,
             holdout=-1),
         times=100),
     val=dict(
@@ -60,19 +62,20 @@ data = dict(
         factor=8, 
         batch_size=-1,
         split='val', 
+        batching=False,
         spherify=False, 
-        no_ndc=True, 
+        no_ndc=False, 
+        to_cuda=True,
         holdout=-1),)
 
 # optimizer
 optimizer = dict(type='Adam', lr=5e-4, betas=(0.9, 0.999))
 optimizer_config = dict(grad_clip=None)
 # learning policy
-lr_config = dict(policy='Step', step=[40,80,120,160,180], gamma=0.5, by_epoch=True)
-# lr_config = dict(policy='Exp', gamma=0.1**((1/1000)*(1/250)), by_epoch=False) 
-runner = dict(type='EpochBasedRunner', max_epochs=200)
+lr_config = dict(policy='Poly', power=1, min_lr=5e-6, by_epoch=False)
+runner = dict(type='IterBasedRunner', max_iters=int(2e5))
 # misc settings
-checkpoint_config = dict(interval=1, max_keep_ckpts=5)
+checkpoint_config = dict(interval=5e3, by_epoch=False, max_keep_ckpts=5)
 log_config = dict(
     interval=200,
     hooks=[
@@ -80,7 +83,8 @@ log_config = dict(
         dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
-    interval=2500, # every 2500 iterations
+    epoch_interval=1,
+    iter_interval=5e3,
     render_params=dict(
         n_samples=64,
         n_importance=128,

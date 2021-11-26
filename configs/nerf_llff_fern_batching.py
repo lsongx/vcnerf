@@ -72,10 +72,10 @@ data = dict(
 optimizer = dict(type='Adam', lr=5e-4, betas=(0.9, 0.999))
 optimizer_config = dict(grad_clip=None)
 # learning policy
-lr_config = dict(policy='Poly', power=1, min_lr=5e-6, by_epoch=True)
-runner = dict(type='EpochBasedRunner', max_epochs=100)
+lr_config = dict(policy='Poly', power=1, min_lr=5e-6, by_epoch=False)
+runner = dict(type='IterBasedRunner', max_iters=int(2e5))
 # misc settings
-checkpoint_config = dict(interval=1, max_keep_ckpts=5)
+checkpoint_config = dict(interval=5e3, by_epoch=False, max_keep_ckpts=5)
 log_config = dict(
     interval=1000,
     hooks=[
@@ -83,7 +83,8 @@ log_config = dict(
         # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
-    interval=1,
+    epoch_interval=1,
+    iter_interval=5e3,
     render_params=dict(
         n_samples=64,
         n_importance=128,
@@ -92,6 +93,7 @@ evaluation = dict(
         inv_depth=False,
         use_dirs=True,
         max_rays_num=1024*2,))
+extra_hooks = [dict(type='IterAdjustHook',), ]
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './data/out'
