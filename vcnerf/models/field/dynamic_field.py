@@ -11,23 +11,23 @@ from .base_field import BaseField
 class DeformationField(nn.Module):
     def __init__(
         self,
-        nb_layers=8,
+        num_layers=8,
         hid_dims=256,
         xyz_emb_dims=63,
         t_emb_dims=9
     ):
         super().__init__()
-        self.nb_layers = nb_layers
+        self.num_layers = num_layers
         self.hid_dims = hid_dims
         self.xyz_emb_dims = xyz_emb_dims
         self.t_emb_dims = t_emb_dims
-        self.skips = [nb_layers // 2]
+        self.skips = [num_layers // 2]
 
         input_dims = xyz_emb_dims + t_emb_dims
 
         self.layers = nn.ModuleDict()
         self.layers.add_module('fc0', nn.Linear(input_dims, hid_dims))
-        for i in range(1, nb_layers):
+        for i in range(1, num_layers):
             if i in self.skips:
                 self.layers.add_module(
                     'fc{}'.format(i), 
@@ -46,7 +46,7 @@ class DeformationField(nn.Module):
     def forward(self, xyz_embeds, t_embeds):
         input_embeds = torch.cat([xyz_embeds, t_embeds], dim=1)
         x = input_embeds.clone()
-        for i in range(self.nb_layers):
+        for i in range(self.num_layers):
             key = 'fc{}'.format(i)
             layer = self.layers[key]
             if i in self.skips:
