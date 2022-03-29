@@ -175,8 +175,8 @@ class NeRF(nn.Module):
                            rays_ori, rays_dir, z_vals, 
                            viewdirs, field, 
                            raw2outputs_params, max_rays_num, weights=None):
-        nb_rays = rays_ori.shape[0]
-        if nb_rays <= max_rays_num or self.training:
+        num_rays = rays_ori.shape[0]
+        if num_rays <= max_rays_num or self.training:
             z_vals = self.sample_new_z_vals(z_vals, weights)
             points = rays_ori[..., None, :] + \
                      rays_dir[..., None, :] * \
@@ -186,8 +186,8 @@ class NeRF(nn.Module):
         else:
             outputs = []
             start = 0
-            while start < nb_rays:
-                end = min(start+max_rays_num, nb_rays)
+            while start < num_rays:
+                end = min(start+max_rays_num, num_rays)
                 assert start < end, 'start >= end ({:d}, {:d})'.format(start, end)
                 local_z_vals = self.sample_new_z_vals(z_vals, weights, start, end)
                 points = rays_ori[start:end, None, :] + \
