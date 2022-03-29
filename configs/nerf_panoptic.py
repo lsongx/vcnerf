@@ -8,25 +8,27 @@ model = dict(
         type='BaseEmbedder',
         in_dims=3, 
         n_freqs=10, 
-        include_input=True),
+        scale=8,
+        include_input=False),
     dir_embedder=dict(
         type='BaseEmbedder',
         in_dims=3, 
         n_freqs=4, 
-        include_input=True),
+        scale=64,
+        include_input=False),
     coarse_field=dict(
         type='BaseField',
         nb_layers=8, 
         hid_dims=256, 
-        xyz_emb_dims=2*3*10+3,
-        dir_emb_dims=2*3*4+3,
+        xyz_emb_dims=2*3*10,#+3,
+        dir_emb_dims=2*3*4,#+3,
         use_dirs=True),
     fine_field=dict(
         type='BaseField',
         nb_layers=8, 
         hid_dims=256, 
-        xyz_emb_dims=2*3*10+3,
-        dir_emb_dims=2*3*4+3,
+        xyz_emb_dims=2*3*10,#+3,
+        dir_emb_dims=2*3*4,#+3,
         use_dirs=True),
     render_params=dict( # default render cfg; train cfg
         n_samples=64,
@@ -35,34 +37,31 @@ model = dict(
         alpha_noise_std=1.0,
         inv_depth=False,
         use_dirs=True,
-        white_bkgd=True,
-        max_rays_num=1024,))
+        max_rays_num=1024*3,))
 
 # dataset settings
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=2,
+    workers_per_gpu=0,
     train=dict(
-        type='RepeatDataset',
-        dataset=dict(
-            type='SyntheticDataset',
-            base_dir='~/data/3d/nerf/nerf_synthetic/lego', 
-            half_res=False,
-            batch_size=1024*4,
-            white_bkgd=True,
-            # precrop_frac=0.5,
-            testskip=8,
-            split='train'),
-        times=20),
+        type='PanopticDataset',
+        datadir='~/data/3d/panoptic/161029_sports1', 
+        ratio=1/2, 
+        frame=2888,
+        selected_cam=list(range(30)),
+        batch_size=1024*3,
+        pre_shuffle=True,
+        to_cuda=True,),
     val=dict(
-        type='SyntheticDataset',
-        base_dir='~/data/3d/nerf/nerf_synthetic/lego', 
-        half_res=False,
+        type='PanopticDataset',
+        datadir='~/data/3d/panoptic/161029_sports1', 
+        ratio=1/2, 
+        frame=2888,
+        selected_cam=[30],
         batch_size=-1,
-        white_bkgd=True,
-        # precrop_frac=0.5,
-        testskip=8,
-        split='val'))
+        repeat=1,
+        pre_shuffle=False,
+        to_cuda=True,),)
 
 # optimizer
 optimizer = dict(type='Adam', lr=5e-4, betas=(0.9, 0.999))
@@ -73,14 +72,14 @@ runner = dict(type='IterBasedRunner', max_iters=int(2e5))
 # misc settings
 checkpoint_config = dict(interval=int(5e3), by_epoch=False, max_keep_ckpts=5)
 log_config = dict(
-    interval=200,
+    interval=1000,
     hooks=[
         dict(type='TextLoggerHook', interval_exp_name=10000),
         # dict(type='TensorboardLoggerHook', log_dir='./logs')
     ])
 evaluation = dict(
     epoch_interval=1,
-    iter_interval=5e3,
+    iter_interval=int(5e3),
     render_params=dict(
         n_samples=64,
         n_importance=128,
@@ -88,15 +87,8 @@ evaluation = dict(
         alpha_noise_std=0,
         inv_depth=False,
         use_dirs=True,
-        white_bkgd=True,
-        max_rays_num=1024*3,))
-extra_hooks = [
-    dict(type='IterAdjustHook',), 
-    dict(
-        type='DatasetParamAdjustHook',
-        param_name_adjust_iter_value = [
-            # ('precrop_frac', 0, 0.9),
-            ('precrop_frac', 500, 1),],)]
+        max_rays_num=1024*2,))
+extra_hooks = [dict(type='IterAdjustHook',), ]
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './data/out'

@@ -6,7 +6,6 @@ import numpy as np
 import imageio
 import cv2
 import torch
-from torch._C import device
 
 from vcnerf.utils import get_root_logger
 from .builder import DATASETS

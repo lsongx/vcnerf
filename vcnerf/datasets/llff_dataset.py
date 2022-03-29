@@ -3,7 +3,6 @@ import os
 import numpy as np
 from PIL import Image
 import torch
-from torch._C import device
 
 from vcnerf.utils import get_root_logger
 from .synthetic_dataset import get_rays
